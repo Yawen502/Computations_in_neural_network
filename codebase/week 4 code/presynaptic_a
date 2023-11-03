@@ -103,7 +103,8 @@ class customGRUCell(nn.Module):
 
         # Firing rate, Scaling factor and time step initialization
         self.r_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
-        
+        # A depends on presynaptic activity, so it is defined in the forward function
+        self.a = torch.nn.Parameter(torch.rand(self.hidden_size, 1))
         self.dt = nn.Parameter(torch.tensor(0.1))
         # dt is clamped between 0 and 1 to ensure it makes sense biologically
 
@@ -211,6 +212,7 @@ def train(num_epochs, model, loaders):
     return train_acc
 
 'Bayesian Optimization on learning rate'
+'''
 from bayes_opt import BayesianOptimization
 def optimize_function(learning_rate):
     model = RNN(32*3, hidden_size, num_layers, num_classes).to(device)
@@ -243,7 +245,7 @@ optimizer = BayesianOptimization(
 train_acc = train(num_epochs, model, loaders)
 optimizer.maximize( init_points =5, n_iter = 15)
 print(optimizer.max)
-
+'''
 'Testing Accuracy'
 # Test the model
 model.eval()

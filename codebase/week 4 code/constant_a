@@ -103,7 +103,6 @@ class customGRUCell(nn.Module):
 
         # Firing rate, Scaling factor and time step initialization
         self.r_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
-        self.a = torch.nn.Parameter(torch.tensor(0.1))
         self.dt = nn.Parameter(torch.tensor(0.1))
         # dt is clamped between 0 and 1 to ensure it makes sense biologically
 
