@@ -83,7 +83,7 @@ hidden_size = 50
 num_layers = 1
 num_classes = 10
 batch_size = 50
-num_epochs = 10
+num_epochs = 20
 learning_rate = 0.01
 
 'Model Definition'
