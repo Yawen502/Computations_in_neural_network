@@ -79,12 +79,12 @@ import torch.nn.functional as F
 
 input_size = 3*32
 sequence_length = 32*32*3//input_size
-hidden_size = 100
+hidden_size = 50
 num_layers = 1
 num_classes = 10
 batch_size = 100
-num_epochs = 50
-learning_rate = 0.007
+num_epochs = 20
+learning_rate = 0.01
 
 'Model Definition'
 class customGRUCell(nn.Module):
@@ -268,3 +268,6 @@ plt.title('Training Accuracy over Steps')
 plt.legend()
 plt.grid(True)
 plt.show()
+
+# Save train accuracy
+np.save('01_constant', train_acc)

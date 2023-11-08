@@ -79,12 +79,12 @@ import torch.nn.functional as F
 
 input_size = 3*32
 sequence_length = 32*32*3//input_size
-hidden_size = 100
+hidden_size = 50
 num_layers = 1
 num_classes = 10
-batch_size = 100
-num_epochs = 50
-learning_rate = 0.007
+batch_size = 50
+num_epochs = 10
+learning_rate = 0.01
 
 'Model Definition'
 class customGRUCell(nn.Module):
@@ -99,14 +99,14 @@ class customGRUCell(nn.Module):
 
         # Update gate z_t
         # Wz and Pz are defined in the forward function, as they take absolute values of W_r and P_r            
-        self.g_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))           
+        self.g_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))     
+        self.a = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))      
 
         # Firing rate, Scaling factor and time step initialization
         self.r_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
-        # a and dt are fixed
-        self.a = nn.Parameter(torch.tensor(0.1), requires_grad = False)
+        # dt is a constant
         self.dt = nn.Parameter(torch.tensor(0.1), requires_grad = False)
-        # dt is clamped between 0 and 1 to ensure it makes sense biologically
+
 
         # Nonlinear functions
         self.Sigmoid = nn.Sigmoid()
@@ -121,7 +121,8 @@ class customGRUCell(nn.Module):
         self.A = 10 * self.Sigmoid(self.a)
         w_z = torch.abs(self.w_r)
         p_z = torch.abs(self.p_r)
-        self.z_t = self.dt * self.Sigmoid(torch.matmul(w_z, self.A * self.r_t) + torch.matmul(p_z, x) + self.g_z)
+        self.z_t = torch.zeros(self.hidden_size, 1)
+        self.z_t = self.dt * self.Sigmoid( torch.matmul(torch.matmul(self.A, w_z) , self.r_t) + torch.matmul(p_z, x) + self.g_z)
         self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Tanh(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
         self.r_t = torch.transpose(self.r_t, 0, 1)                
 
@@ -268,3 +269,8 @@ plt.title('Training Accuracy over Steps')
 plt.legend()
 plt.grid(True)
 plt.show()
+
+# Save train accuracy
+# to avoid same name
+
+np.save('02_conductance.npy', train_acc)

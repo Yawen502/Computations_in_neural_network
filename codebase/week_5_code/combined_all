@@ -87,9 +87,9 @@ num_epochs = 50
 learning_rate = 0.007
 
 'Model Definition'
-class customGRUCell(nn.Module):
+class customGRUCell01(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers):
-        super(customGRUCell, self).__init__()
+        super(customGRUCell01, self).__init__()
         self.hidden_size = hidden_size
     
         # Rest gate r_t 
@@ -125,10 +125,10 @@ class customGRUCell(nn.Module):
         self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Tanh(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
         self.r_t = torch.transpose(self.r_t, 0, 1)                
 
-class customGRU(nn.Module):
+class customGRU01(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
-        super(customGRU, self).__init__()
-        self.rnncell = customGRUCell(input_size, hidden_size, num_layers).to(device)
+        super(customGRU01, self).__init__()
+        self.rnncell = customGRUCell01(input_size, hidden_size, num_layers).to(device)
         self.batch_first = batch_first
 
     def forward(self, x):
@@ -139,13 +139,13 @@ class customGRU(nn.Module):
                 self.rnncell(x_slice)
         return self.rnncell.r_t             
             
-class RNN(nn.Module):
+class RNN01(nn.Module):
     
     def __init__(self, input_size, hidden_size, num_layers, num_classes):
-        super(RNN, self).__init__()
+        super(RNN01, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.lstm = customGRU(input_size, hidden_size, num_layers)
+        self.lstm = customGRU01(input_size, hidden_size, num_layers)
         self.fc = nn.Linear(hidden_size, 10)
         pass
 
@@ -161,13 +161,169 @@ class RNN(nn.Module):
         
         pass                                    
 pass
-model = RNN(input_size, hidden_size, num_layers, num_classes).to(device)
-print(model)
+
+# Second model
+class customGRUCell02(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers):
+        super(customGRUCell02, self).__init__()
+        self.hidden_size = hidden_size
+    
+        # Rest gate r_t 
+        self.w_r = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
+        self.p_r = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))           
+        self.b_r = torch.nn.Parameter(torch.rand(self.hidden_size, 1))   
+
+        # Update gate z_t
+        # Wz and Pz are defined in the forward function, as they take absolute values of W_r and P_r            
+        self.g_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))           
+
+        # Firing rate, Scaling factor and time step initialization
+        self.r_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
+        # a and dt are fixed
+        self.a = nn.Parameter(torch.tensor(0.1), requires_grad = False)
+        self.dt = nn.Parameter(torch.tensor(0.1), requires_grad = False)
+        # dt is clamped between 0 and 1 to ensure it makes sense biologically
+
+        # Nonlinear functions
+        self.Sigmoid = nn.Sigmoid()
+        self.Tanh = nn.Tanh()
+        for name, param in self.named_parameters():
+            nn.init.uniform_(param, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
+
+    def forward(self, x):        
+        if self.r_t.dim() == 3:           
+            self.r_t = self.r_t[0]
+        self.r_t = torch.transpose(self.r_t, 0, 1)
+        self.A = 10 * self.Sigmoid(self.a)
+        w_z = torch.abs(self.w_r)
+        p_z = torch.abs(self.p_r)
+        self.z_t = self.dt * self.Sigmoid(torch.matmul(w_z, self.A * self.r_t) + torch.matmul(p_z, x) + self.g_z)
+        self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Tanh(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
+        self.r_t = torch.transpose(self.r_t, 0, 1)                
+
+class customGRU02(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
+        super(customGRU02, self).__init__()
+        self.rnncell = customGRUCell02(input_size, hidden_size, num_layers).to(device)
+        self.batch_first = batch_first
+
+    def forward(self, x):
+        if self.batch_first == True:
+            for n in range(x.size(1)):
+                #print(x.shape)
+                x_slice = torch.transpose(x[:,n,:], 0, 1)
+                self.rnncell(x_slice)
+        return self.rnncell.r_t             
+            
+class RNN02(nn.Module):
+    
+    def __init__(self, input_size, hidden_size, num_layers, num_classes):
+        super(RNN01, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.lstm = customGRU02(input_size, hidden_size, num_layers)
+        self.fc = nn.Linear(hidden_size, 10)
+        pass
+
+    def forward(self, x):
+        # Set initial hidden and cell states 
+        self.lstm.rnncell.r_t = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device) 
+        #c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+        # Passing in the input and hidden state into the model and  obtaining outputs
+        out = self.lstm(x)  # out: tensor of shape (batch_size, seq_length, hidden_size)
+        #Reshaping the outputs such that it can be fit into the fully connected layer
+        out = self.fc(out)
+        return out.squeeze(-1)
+        
+        pass                                    
+pass
+
+# Third model
+class customGRUCell03(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers):
+        super(customGRUCell03, self).__init__()
+        self.hidden_size = hidden_size
+    
+        # Rest gate r_t 
+        self.w_r = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
+        self.p_r = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))           
+        self.b_r = torch.nn.Parameter(torch.rand(self.hidden_size, 1))   
+
+        # Update gate z_t
+        # Wz and Pz are defined in the forward function, as they take absolute values of W_r and P_r            
+        self.g_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))           
+
+        # Firing rate, Scaling factor and time step initialization
+        self.r_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
+        # a and dt are fixed
+        self.a = nn.Parameter(torch.tensor(0.1), requires_grad = False)
+        self.dt = nn.Parameter(torch.tensor(0.1), requires_grad = False)
+        # dt is clamped between 0 and 1 to ensure it makes sense biologically
+
+        # Nonlinear functions
+        self.Sigmoid = nn.Sigmoid()
+        self.Tanh = nn.Tanh()
+        for name, param in self.named_parameters():
+            nn.init.uniform_(param, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
+
+    def forward(self, x):        
+        if self.r_t.dim() == 3:           
+            self.r_t = self.r_t[0]
+        self.r_t = torch.transpose(self.r_t, 0, 1)
+        self.A = 10 * self.Sigmoid(self.a)
+        w_z = torch.abs(self.w_r)
+        p_z = torch.abs(self.p_r)
+        self.z_t = self.dt * self.Sigmoid(torch.matmul(w_z, self.A * self.r_t) + torch.matmul(p_z, x) + self.g_z)
+        self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Tanh(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
+        self.r_t = torch.transpose(self.r_t, 0, 1)                
+
+class customGRU03(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
+        super(customGRU03, self).__init__()
+        self.rnncell = customGRUCell03(input_size, hidden_size, num_layers).to(device)
+        self.batch_first = batch_first
+
+    def forward(self, x):
+        if self.batch_first == True:
+            for n in range(x.size(1)):
+                #print(x.shape)
+                x_slice = torch.transpose(x[:,n,:], 0, 1)
+                self.rnncell(x_slice)
+        return self.rnncell.r_t             
+            
+class RNN03(nn.Module):
+    
+    def __init__(self, input_size, hidden_size, num_layers, num_classes):
+        super(RNN03, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.lstm = customGRU02(input_size, hidden_size, num_layers)
+        self.fc = nn.Linear(hidden_size, 10)
+        pass
+
+    def forward(self, x):
+        # Set initial hidden and cell states 
+        self.lstm.rnncell.r_t = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device) 
+        #c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+        # Passing in the input and hidden state into the model and  obtaining outputs
+        out = self.lstm(x)  # out: tensor of shape (batch_size, seq_length, hidden_size)
+        #Reshaping the outputs such that it can be fit into the fully connected layer
+        out = self.fc(out)
+        return out.squeeze(-1)
+        
+        pass                                    
+pass
+
+model01 = RNN01(input_size, hidden_size, num_layers, num_classes).to(device)
+model02 = RNN02(input_size, hidden_size, num_layers, num_classes).to(device)
+model03 = RNN03(input_size, hidden_size, num_layers, num_classes).to(device)
+#print(model)
 loss_func = nn.CrossEntropyLoss()
 
 'Trajactory Tracking and Training'
 from torch import optim
-model_optimizer = optim.Adam(model.parameters(), lr = learning_rate)   
+model_optimizer_constant = optim.Adam(model01.parameters(), lr = learning_rate)
+model_optimizer_varied = optim.Adam(model03.parameters(), lr = learning_rate)   
 
 from torch.utils.data import DataLoader, Subset
 from sklearn.model_selection import StratifiedShuffleSplit
@@ -212,7 +368,7 @@ def evaluate_while_training(model, loaders):
 
     return 100 * correct / total
 
-def train(num_epochs, model, loaders):
+def train_constant(num_epochs, model, loaders):
     model.train()
     total_step = len(loaders['train'])
     train_acc = []
@@ -225,7 +381,7 @@ def train(num_epochs, model, loaders):
             outputs = model(images)
             loss = loss_func(outputs, labels)
             # Backward and optimize
-            model_optimizer.zero_grad()
+            model_optimizer_constant.zero_grad()
             loss.backward()
             model_optimizer.step()
             

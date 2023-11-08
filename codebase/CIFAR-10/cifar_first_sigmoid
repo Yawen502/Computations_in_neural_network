@@ -78,13 +78,13 @@ loaders
 from torch import nn
 import torch.nn.functional as F
 
-sequence_length = 32
-input_size = 32*3
+input_size = 16*3
+sequence_length = 32*32*3//input_size
 hidden_size = 100
 num_layers = 1
 num_classes = 10
 batch_size = 100
-num_epochs = 5
+num_epochs = 2
 learning_rate = 0.007
 
 
@@ -161,7 +161,7 @@ class RNN(nn.Module):
         
         pass                                    
 pass
-model = RNN(32*3, hidden_size, num_layers, num_classes).to(device)
+model = RNN(input_size, hidden_size, num_layers, num_classes).to(device)
 print(model)
 loss_func = nn.CrossEntropyLoss()
 
@@ -173,7 +173,7 @@ def evaluate_while_training(model, loaders):
     correct = 0
     total = 0
     with torch.no_grad():
-        for images, labels in loaders['train']:
+        for images, labels in loaders['test']:
             images = images.reshape(-1, 32, 32*3).to(device)
             labels = labels.to(device)
             outputs = model(images)
