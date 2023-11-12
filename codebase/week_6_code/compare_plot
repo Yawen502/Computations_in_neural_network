@@ -1,0 +1,22 @@
+import matplotlib.pyplot as plt
+
+# Example data
+hyperparameters = ['input size 12']
+accuracies = [35.34]  # Final accuracies for each hyperparameter
+errors = [(35.56-35.34, -34.68+35.34)]  # (Max error, Min error) pairs
+#constant: 17.76: 16.79,17.77
+# Separate the error values into two lists for upper and lower bounds
+upper_errors = [u for u, l in errors]
+lower_errors = [l for u, l in errors]
+asymmetric_error = [lower_errors, upper_errors]
+
+# Plotting
+plt.figure(figsize=(10, 6))
+plt.errorbar(hyperparameters, accuracies, yerr=asymmetric_error, fmt='o', ecolor='red', capthick=2)
+plt.xlabel('Hyperparameters')
+plt.ylabel('Final Accuracy')
+plt.title('Hyperparameter Tuning Performance')
+plt.grid(True)
+
+# Show the plot
+plt.show()

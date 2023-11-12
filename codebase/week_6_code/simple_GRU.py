@@ -82,7 +82,7 @@ sequence_length = 32*32*3//input_size
 hidden_size = 100
 num_layers = 1
 num_classes = 10
-batch_size = 50
+batch_size = 100
 num_epochs = 10
 learning_rate = 0.01
 
@@ -98,15 +98,13 @@ class customGRUCell(nn.Module):
         self.b_r = torch.nn.Parameter(torch.rand(self.hidden_size, 1))   
 
         # Update gate z_t
-        # Wz and Pz are defined in the forward function, as they take absolute values of W_r and P_r            
-        self.g_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))     
-        self.a = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))      
+        # Wz is defined in the forward function
+        self.w_z = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
+        self.p_z = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))
+        self.b_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))         
 
         # Firing rate, Scaling factor and time step initialization
         self.r_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
-        # dt is a constant
-        self.dt = nn.Parameter(torch.tensor(0.1), requires_grad = False)
-
 
         # Nonlinear functions
         self.Sigmoid = nn.Sigmoid()
@@ -118,11 +116,7 @@ class customGRUCell(nn.Module):
         if self.r_t.dim() == 3:           
             self.r_t = self.r_t[0]
         self.r_t = torch.transpose(self.r_t, 0, 1)
-        self.A = 10 * self.Sigmoid(self.a)
-        w_z = torch.abs(self.w_r)
-        p_z = torch.abs(self.p_r)
-        self.z_t = torch.zeros(self.hidden_size, 1)
-        self.z_t = self.dt * self.Sigmoid( torch.matmul(torch.matmul(self.A, w_z) , self.r_t) + torch.matmul(p_z, x) + self.g_z)
+        self.z_t = self.Sigmoid(torch.matmul(self.w_z, self.r_t) + torch.matmul(self.p_z, x) + self.b_z)
         self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Tanh(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
         self.r_t = torch.transpose(self.r_t, 0, 1)                
 
@@ -258,19 +252,5 @@ with torch.no_grad():
 
 print('Accuracy of the model:{}%'.format(100 * correct/ total))
 
-'Plotting'
-import matplotlib.pyplot as plt
-# Plotting
-plt.figure(figsize = (12, 6))    
-plt.plot(train_acc, label = 'Training Accuracy')
-plt.xlabel('Steps (in 100s)')
-plt.ylabel('Accuracy (%)')
-plt.title('Training Accuracy over Steps')
-plt.legend()
-plt.grid(True)
-plt.show()
-
 # Save train accuracy
-# to avoid same name
-
-np.save('02_conductance.npy', train_acc)
+np.save('03_simple_GRU_small.npy', train_acc)

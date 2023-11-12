@@ -77,13 +77,13 @@ loaders
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 3*4
+input_size = 3*32
 sequence_length = 32*32*3//input_size
-hidden_size = 100
+hidden_size = 50
 num_layers = 1
 num_classes = 10
 batch_size = 50
-num_epochs = 10
+num_epochs = 20
 learning_rate = 0.01
 
 'Model Definition'

@@ -77,7 +77,7 @@ loaders
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 3*16
+input_size = 3*4
 sequence_length = 32*32*3//input_size
 hidden_size = 100
 num_layers = 1
@@ -251,18 +251,6 @@ with torch.no_grad():
         correct += (predicted ==labels).sum().item()
 
 print('Accuracy of the model:{}%'.format(100 * correct/ total))
-
-'Plotting'
-import matplotlib.pyplot as plt
-# Plotting
-plt.figure(figsize = (12, 6))    
-plt.plot(train_acc, label = 'Training Accuracy')
-plt.xlabel('Steps (in 100s)')
-plt.ylabel('Accuracy (%)')
-plt.title('Training Accuracy over Steps')
-plt.legend()
-plt.grid(True)
-plt.show()
 
 # Save train accuracy
 np.save('03_simple_GRU_small.npy', train_acc)

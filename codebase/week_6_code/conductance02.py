@@ -77,13 +77,13 @@ loaders
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 3*4
+input_size = 3*16
 sequence_length = 32*32*3//input_size
 hidden_size = 100
 num_layers = 1
 num_classes = 10
-batch_size = 50
-num_epochs = 10
+batch_size = 100
+num_epochs = 20
 learning_rate = 0.01
 
 'Model Definition'
@@ -122,7 +122,8 @@ class customGRUCell(nn.Module):
         w_z = torch.abs(self.w_r)
         p_z = torch.abs(self.p_r)
         self.z_t = torch.zeros(self.hidden_size, 1)
-        self.z_t = self.dt * self.Sigmoid( torch.matmul(torch.matmul(self.A, w_z) , self.r_t) + torch.matmul(p_z, x) + self.g_z)
+        K = self.A[:, None]
+        self.z_t = self.dt * self.Sigmoid(torch.matmul(self.A, w_z) , self.r_t) + torch.matmul(p_z, x) + self.g_z)
         self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Tanh(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
         self.r_t = torch.transpose(self.r_t, 0, 1)                
 
