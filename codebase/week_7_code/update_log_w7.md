@@ -20,7 +20,25 @@ Tanh is changed to Sigmoid to ensure $r_t$ is always positive.
 ### A depends on presynaptic neuron
 A takes two values according to excitatory or inhibitory neurons. But A is always positive.
 
+### Only excitatory neurons give outputs
 
+        class customGRUCell(nn.Module):
+            ...
+            def forward(self, x): 
+            ...
+            # zero out inhibitory neurons for output
+            excitatory_mask = self.w_r.data > 0  # Mask for excitatory cells
+            excitatory_mask = excitatory_mask.any(dim=1).unsqueeze(0) # Match the shape of r_t
+            self.excitatory_outputs = self.r_t * excitatory_mask
+
+
+        class customGRU(nn.Module):
+            ...
+            def forward(self, x):
+                if self.batch_first == True:
+                    ...
+                return self.rnncell.excitatory_outputs   
+        
 ## Implementing Short Term Plasticity
 
 ## New problems
@@ -54,3 +72,7 @@ we discovered $w_r$ and $r_t$ are both very small, probably due to the constrain
 GA can differ in performances from gradient basedd methods in many ways, and it can be used for parameter optimisation or optimisation of the whole structure. It also gives biological insights which in some senses 
 agrees with bRNN. For example for some parameters like values for scaling matrix $A$ and time increment $dt$ we can use GA to decide its value rather than trained using gradient optimisation. But it might have problems with complexity and 
 biological interpretations.
+
+
+### Comparison of Model
+Accuracy of the model:37.72%
