@@ -20,42 +20,24 @@ print(torch.cuda.device_count()) # returns 1 in my case
 # get the name of the device
 print(torch.cuda.get_device_name(0)) # good old Tesla K80
 
-def snake_scan(img):
-    'Converts a 32x32 image to a 32x96 array with snake-like row ordering'
-    if len(img.shape) != 3:
-        raise ValueError('Input image must be a 3D array')
-    
-    channels, rows, cols = img.shape
-    snake = np.zeros((rows, cols * channels), dtype=img.dtype)
-    for r in range(rows):
-        row_data = img[:, r, :].flatten()  # Flattening each row into a 1D array of 96 elements
-        if r % 2 == 1:
-            row_data = row_data[::-1]  # Reversing the order for alternate rows
-        snake[r] = row_data
-    return snake
-
 from torchvision import datasets
 from torchvision import transforms
 from torchvision.transforms import ToTensor
 from torchvision.transforms import Lambda
 
-transform = transforms.Compose([
-    ToTensor(),
-    Lambda(lambda x: torch.tensor(snake_scan(x.numpy())))
-])
-
-train_data = datasets.CIFAR10(
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+train_data = datasets.MNIST(
     root = 'data',
-    train = True,
-    download = False,
-    transform = transform
+    train = True,                         
+    transform = ToTensor(), 
+    download = False,            
 )
-
-test_data = datasets.CIFAR10(
-    root = 'data',
-    train = False,
+test_data = datasets.MNIST(
+    root = 'data', 
+    train = False, 
+    transform = ToTensor(),
     download = False,
-    transform = transform
 )
 
 
@@ -77,13 +59,13 @@ loaders
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 3*16
-sequence_length = 32*32*3//input_size
-hidden_size = 48
+input_size = 4
+sequence_length = 28*28//input_size
+hidden_size = 24
 num_layers = 1
 num_classes = 10
 batch_size = 100
-num_epochs = 20
+num_epochs = 10
 learning_rate = 0.01
 
 'Model Definition'
@@ -98,15 +80,13 @@ class customGRUCell(nn.Module):
         self.b_r = torch.nn.Parameter(torch.rand(self.hidden_size, 1))   
 
         # Update gate z_t
-        # Wz and Pz are defined in the forward function, as they take absolute values of W_r and P_r            
-        self.g_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))     
-        self.a = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))      
+        # Wz is defined in the forward function
+        self.w_z = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
+        self.p_z = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))
+        self.b_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))         
 
         # Firing rate, Scaling factor and time step initialization
         self.r_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
-        # dt is a constant
-        self.dt = nn.Parameter(torch.tensor(0.1), requires_grad = False)
-
 
         # Nonlinear functions
         self.Sigmoid = nn.Sigmoid()
@@ -118,11 +98,7 @@ class customGRUCell(nn.Module):
         if self.r_t.dim() == 3:           
             self.r_t = self.r_t[0]
         self.r_t = torch.transpose(self.r_t, 0, 1)
-        self.A = 10 * self.Sigmoid(self.a)
-        w_z = torch.abs(self.w_r)
-        p_z = torch.abs(self.p_r)
-        self.z_t = torch.zeros(self.hidden_size, 1)
-        self.z_t = self.dt * self.Sigmoid( torch.matmul(torch.matmul(self.A, w_z) , self.r_t) + torch.matmul(p_z, x) + self.g_z)
+        self.z_t = self.Sigmoid(torch.matmul(self.w_z, self.r_t) + torch.matmul(self.p_z, x) + self.b_z)
         self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Tanh(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
         self.r_t = torch.transpose(self.r_t, 0, 1)                
 
@@ -213,18 +189,22 @@ def evaluate_while_training(model, loaders):
 
     return 100 * correct / total
 
-def train(num_epochs, model, loaders):
+def train(num_epochs, model, loaders, patience=2, min_delta=0.01):
     model.train()
     total_step = len(loaders['train'])
     train_acc = []
+    best_acc = 0
+    no_improve_epochs = 0
+
     for epoch in range(num_epochs):
         for i, (images, labels) in enumerate(loaders['train']):
-            
             images = images.reshape(-1, sequence_length, input_size).to(device)
             labels = labels.to(device)
+
             # Forward pass
             outputs = model(images)
             loss = loss_func(outputs, labels)
+
             # Backward and optimize
             model_optimizer.zero_grad()
             loss.backward()
@@ -233,11 +213,22 @@ def train(num_epochs, model, loaders):
             if (i+1) % 100 == 0:
                 accuracy = evaluate_while_training(model, loaders)
                 train_acc.append(accuracy)
-                print ('Epoch [{}/{}], Step [{}/{}], Training Accuracy: {:.2f}' 
-                       .format(epoch + 1, num_epochs, i + 1, total_step, accuracy))
-        
-        pass
+                print('Epoch [{}/{}], Step [{}/{}], Training Accuracy: {:.2f}' 
+                      .format(epoch + 1, num_epochs, i + 1, total_step, accuracy))
+
+                # Check for improvement
+                if accuracy - best_acc > min_delta:
+                    best_acc = accuracy
+                    no_improve_epochs = 0
+                else:
+                    no_improve_epochs += 1
+
+                if no_improve_epochs >= patience:
+                    print("No improvement in validation accuracy for {} epochs. Stopping training.".format(patience))
+                    return train_acc
+
     return train_acc
+
 
 train_acc = train(num_epochs, model, loaders)
 
@@ -271,6 +262,4 @@ plt.grid(True)
 plt.show()
 
 # Save train accuracy
-# to avoid same name
-
-np.save('02_conductance.npy', train_acc)
+np.save('constant_A_bRNN', train_acc)

@@ -34,6 +34,27 @@ def snake_scan(img):
         snake[r] = row_data
     return snake
 
+def baseindexing(time_gap, input_size, a):
+    a = a.flatten()
+    a = a.cpu()
+    a = a.numpy()
+
+    baseinds = np.arange(0, time_gap*input_size, time_gap)
+    print("baseinds", baseinds)
+    #zero padding 
+    a = np.pad(a, (baseinds[-1],0), 'constant')
+
+    new_sequence = []
+
+    for t in range(32*32*3):
+        new_sequence.append(a[(t+baseinds).tolist()])        
+    
+    new_sequence = [item for sublist in new_sequence for item in sublist] 
+    new_sequence = np.array(new_sequence)
+    new_sequence = torch.tensor(new_sequence, dtype=torch.float).to(device)
+    print("size of new sequence tensor", new_sequence.size())
+    return new_sequence
+
 from torchvision import datasets
 from torchvision import transforms
 from torchvision.transforms import ToTensor
@@ -77,14 +98,15 @@ loaders
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 3*4
+input_size = 3*16
 sequence_length = 32*32*3//input_size
-hidden_size = 50
+hidden_size = 100
 num_layers = 1
 num_classes = 10
 batch_size = 100
 num_epochs = 10
 learning_rate = 0.01
+time_gap = 10
 
 'Model Definition'
 class customGRUCell(nn.Module):
@@ -212,18 +234,22 @@ def evaluate_while_training(model, loaders):
 
     return 100 * correct / total
 
-def train(num_epochs, model, loaders):
+def train(num_epochs, model, loaders, patience=5, min_delta=0.01):
     model.train()
     total_step = len(loaders['train'])
     train_acc = []
+    best_acc = 0
+    no_improve_epochs = 0
+
     for epoch in range(num_epochs):
         for i, (images, labels) in enumerate(loaders['train']):
-            # Now we're doing a regression task predicting the last pixel
             images = images.reshape(-1, sequence_length, input_size).to(device)
             labels = labels.to(device)
+            model.train()
             # Forward pass
             outputs = model(images)
             loss = loss_func(outputs, labels)
+
             # Backward and optimize
             model_optimizer.zero_grad()
             loss.backward()
@@ -232,10 +258,20 @@ def train(num_epochs, model, loaders):
             if (i+1) % 100 == 0:
                 accuracy = evaluate_while_training(model, loaders)
                 train_acc.append(accuracy)
-                print ('Epoch [{}/{}], Step [{}/{}], Training Accuracy: {:.2f}' 
-                       .format(epoch + 1, num_epochs, i + 1, total_step, accuracy))
-        
-        pass
+                print('Epoch [{}/{}], Step [{}/{}], Training Accuracy: {:.2f}' 
+                      .format(epoch + 1, num_epochs, i + 1, total_step, accuracy))
+
+                # Check for improvement
+                if accuracy - best_acc > min_delta:
+                    best_acc = accuracy
+                    no_improve_epochs = 0
+                else:
+                    no_improve_epochs += 1
+
+                if no_improve_epochs >= patience:
+                    print("No improvement in validation accuracy for {} epochs. Stopping training.".format(patience))
+                    return train_acc
+
     return train_acc
 
 train_acc = train(num_epochs, model, loaders)

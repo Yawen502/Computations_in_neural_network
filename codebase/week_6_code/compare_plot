@@ -1,22 +1,31 @@
 import matplotlib.pyplot as plt
 
 # Example data
-hyperparameters = ['input size 12']
-accuracies = [35.34]  # Final accuracies for each hyperparameter
-errors = [(35.56-35.34, -34.68+35.34)]  # (Max error, Min error) pairs
-#constant: 17.76: 16.79,17.77
-# Separate the error values into two lists for upper and lower bounds
-upper_errors = [u for u, l in errors]
-lower_errors = [l for u, l in errors]
-asymmetric_error = [lower_errors, upper_errors]
+hyperparameters = ['input size 12', 'input size 24', 'input size 48']
+
+# Accuracies for each model
+accuracies_model1 = [35.34, 49.29, 47.89]  # Simple GRU
+accuracies_model2 = [25.16, 33.92, 35.00]  # Matrix A bRNN
+accuracies_model3 = [41.61, 43.66, 38.96]  # Constant A bRNN
+accuracies_model4 = [11.97, 13.26, 18.95]  # Vanilla RNN
+
 
 # Plotting
 plt.figure(figsize=(10, 6))
-plt.errorbar(hyperparameters, accuracies, yerr=asymmetric_error, fmt='o', ecolor='red', capthick=2)
-plt.xlabel('Hyperparameters')
+
+# Plot for each model in one figure
+plt.plot(hyperparameters, accuracies_model1, '-o', color='red', label='Simple-GRU')
+plt.plot(hyperparameters, accuracies_model2, '-o', color='blue', label='Matrix-A bRNN')
+plt.plot(hyperparameters, accuracies_model3, '-o', color='green', label='Constant-A bRNN')
+plt.plot(hyperparameters, accuracies_model4, '-o', color='orange', label='Vanilla RNN')
+# label 10 accuracy as 'by chance'
+plt.plot(hyperparameters, [10]*3, '--', color='black', label='By chance')
+
 plt.ylabel('Final Accuracy')
-plt.title('Hyperparameter Tuning Performance')
+plt.title('Comparison of Models')
 plt.grid(True)
+plt.legend()
 
 # Show the plot
 plt.show()
+

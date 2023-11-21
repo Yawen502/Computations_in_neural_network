@@ -34,6 +34,27 @@ def snake_scan(img):
         snake[r] = row_data
     return snake
 
+def baseindexing(time_gap, input_size, a):
+    a = a.flatten()
+    a = a.cpu()
+    a = a.numpy()
+
+    baseinds = np.arange(0, time_gap*input_size, time_gap)
+    print("baseinds", baseinds)
+    #zero padding 
+    a = np.pad(a, (baseinds[-1],0), 'constant')
+
+    new_sequence = []
+
+    for t in range(32*32*3):
+        new_sequence.append(a[(t+baseinds).tolist()])        
+    
+    new_sequence = [item for sublist in new_sequence for item in sublist] 
+    new_sequence = np.array(new_sequence)
+    new_sequence = torch.tensor(new_sequence, dtype=torch.float).to(device)
+    print("size of new sequence tensor", new_sequence.size())
+    return new_sequence
+
 from torchvision import datasets
 from torchvision import transforms
 from torchvision.transforms import ToTensor
@@ -79,12 +100,13 @@ import torch.nn.functional as F
 
 input_size = 3*16
 sequence_length = 32*32*3//input_size
-hidden_size = 48
+hidden_size = 200
 num_layers = 1
 num_classes = 10
 batch_size = 100
-num_epochs = 20
+num_epochs = 1
 learning_rate = 0.01
+time_gap = 10
 
 'Model Definition'
 class customGRUCell(nn.Module):
@@ -99,32 +121,41 @@ class customGRUCell(nn.Module):
 
         # Update gate z_t
         # Wz and Pz are defined in the forward function, as they take absolute values of W_r and P_r            
-        self.g_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))     
-        self.a = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))      
+        self.g_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))           
 
         # Firing rate, Scaling factor and time step initialization
         self.r_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
-        # dt is a constant
+        # a and dt are fixed
+        self.a = nn.Parameter(torch.tensor(0.1), requires_grad = False)
         self.dt = nn.Parameter(torch.tensor(0.1), requires_grad = False)
-
+        # dt is clamped between 0 and 1 to ensure it makes sense biologically
 
         # Nonlinear functions
         self.Sigmoid = nn.Sigmoid()
         self.Tanh = nn.Tanh()
+        self.relu = nn.ReLU()
         for name, param in self.named_parameters():
             nn.init.uniform_(param, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
 
     def forward(self, x):        
         if self.r_t.dim() == 3:           
             self.r_t = self.r_t[0]
+        with torch.no_grad():
+            self.w_r.data[:self.hidden_size//2, :self.hidden_size//2] = torch.abs(self.w_r.data[:self.hidden_size//2, :self.hidden_size//2])
+            self.w_r.data[self.hidden_size//2:, :self.hidden_size//2] = torch.abs(self.w_r.data[self.hidden_size//2:, :self.hidden_size//2])
+            self.w_r.data[:self.hidden_size//2, self.hidden_size//2:] = -torch.abs(self.w_r.data[:self.hidden_size//2, self.hidden_size//2:])
+            self.w_r.data[self.hidden_size//2:, self.hidden_size//2:] = -torch.abs(self.w_r.data[self.hidden_size//2:, self.hidden_size//2:])
         self.r_t = torch.transpose(self.r_t, 0, 1)
-        self.A = 10 * self.Sigmoid(self.a)
+        # Apply constraints to follow Dale's principle
         w_z = torch.abs(self.w_r)
+
+        self.A = 10 * self.Sigmoid(self.a)
         p_z = torch.abs(self.p_r)
-        self.z_t = torch.zeros(self.hidden_size, 1)
-        self.z_t = self.dt * self.Sigmoid( torch.matmul(torch.matmul(self.A, w_z) , self.r_t) + torch.matmul(p_z, x) + self.g_z)
-        self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Tanh(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
-        self.r_t = torch.transpose(self.r_t, 0, 1)                
+        self.z_t = self.dt * self.Sigmoid(torch.matmul(w_z, self.A * self.r_t) + torch.matmul(p_z, x) + self.g_z)
+        self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Sigmoid(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
+        self.r_t = torch.transpose(self.r_t, 0, 1) 
+        print(self.w_r)               
+
 
 class customGRU(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
@@ -213,18 +244,22 @@ def evaluate_while_training(model, loaders):
 
     return 100 * correct / total
 
-def train(num_epochs, model, loaders):
+def train(num_epochs, model, loaders, patience=5, min_delta=0.01):
     model.train()
     total_step = len(loaders['train'])
     train_acc = []
+    best_acc = 0
+    no_improve_epochs = 0
+
     for epoch in range(num_epochs):
         for i, (images, labels) in enumerate(loaders['train']):
-            
             images = images.reshape(-1, sequence_length, input_size).to(device)
             labels = labels.to(device)
+            model.train()
             # Forward pass
             outputs = model(images)
             loss = loss_func(outputs, labels)
+
             # Backward and optimize
             model_optimizer.zero_grad()
             loss.backward()
@@ -233,10 +268,20 @@ def train(num_epochs, model, loaders):
             if (i+1) % 100 == 0:
                 accuracy = evaluate_while_training(model, loaders)
                 train_acc.append(accuracy)
-                print ('Epoch [{}/{}], Step [{}/{}], Training Accuracy: {:.2f}' 
-                       .format(epoch + 1, num_epochs, i + 1, total_step, accuracy))
-        
-        pass
+                print('Epoch [{}/{}], Step [{}/{}], Training Accuracy: {:.2f}' 
+                      .format(epoch + 1, num_epochs, i + 1, total_step, accuracy))
+
+                # Check for improvement
+                if accuracy - best_acc > min_delta:
+                    best_acc = accuracy
+                    no_improve_epochs = 0
+                else:
+                    no_improve_epochs += 1
+
+                if no_improve_epochs >= patience:
+                    print("No improvement in validation accuracy for {} epochs. Stopping training.".format(patience))
+                    return train_acc
+
     return train_acc
 
 train_acc = train(num_epochs, model, loaders)
@@ -271,6 +316,4 @@ plt.grid(True)
 plt.show()
 
 # Save train accuracy
-# to avoid same name
-
-np.save('02_conductance.npy', train_acc)
+np.save('constant_A_bRNN', train_acc)

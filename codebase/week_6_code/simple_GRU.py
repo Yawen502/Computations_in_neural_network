@@ -77,7 +77,7 @@ loaders
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 3*4
+input_size = 3*16
 sequence_length = 32*32*3//input_size
 hidden_size = 100
 num_layers = 1
@@ -254,3 +254,12 @@ print('Accuracy of the model:{}%'.format(100 * correct/ total))
 
 # Save train accuracy
 np.save('03_simple_GRU_small.npy', train_acc)
+
+"""
+Epoch [10/10], Step [400/500], Training Accuracy: 21.40
+Epoch [10/10], Step [500/500], Training Accuracy: 22.50
+Accuracy of the model:23.43%
+Epoch [10/10], Step [400/500], Training Accuracy: 50.20
+Epoch [10/10], Step [500/500], Training Accuracy: 48.40
+Accuracy of the model:49.29%
+"""
