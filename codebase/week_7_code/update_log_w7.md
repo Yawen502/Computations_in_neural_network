@@ -52,5 +52,5 @@ we discovered $w_r$ and $r_t$ are both very small, probably due to the constrain
 
 ### Is optimisation algorithms like GA going the help the RNN structure?
 GA can differ in performances from gradient basedd methods in many ways, and it can be used for parameter optimisation or optimisation of the whole structure. It also gives biological insights which in some senses 
-agrees with bRNN. For example for some parameters like values for scaling matrix $A$ we can use GA to decide its value rather than trained using gradient optimisation. But it might have problems with complexity and 
+agrees with bRNN. For example for some parameters like values for scaling matrix $A$ and time increment $dt$ we can use GA to decide its value rather than trained using gradient optimisation. But it might have problems with complexity and 
 biological interpretations.
