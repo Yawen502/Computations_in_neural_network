@@ -22,6 +22,20 @@ We use n=200 (a relatively large number) for preliminary testing
 ### Scaling factor A depends on presynaptic neuron
 A takes two values according to excitatory or inhibitory neurons. But A is always positive.
 
+            class customGRUCell(nn.Module):
+                def __init__(self, input_size, hidden_size, num_layers):
+                    ...
+                    self.a_excitatory = nn.Parameter(torch.tensor(0.5), requires_grad=True)
+                    self.a_inhibitory = nn.Parameter(torch.tensor(0.5), requires_grad=True)
+                def forward(self, x):  
+                    ...
+                    is_excitatory = self.w_r.data > 0  
+                    a = torch.where(is_excitatory, self.a_excitatory, self.a_inhibitory)
+                    self.A = 10 * self.Sigmoid(a)
+                    self.A = self.A.transpose(0, 1)
+                    
+                    self.z_t = self.dt * self.Sigmoid(torch.matmul(w_z, torch.matmul(self.A,self.r_t)) + torch.matmul(p_z, x) + self.g_z)
+
 ### Only excitatory neurons give outputs
 
         class customGRUCell(nn.Module):
@@ -41,7 +55,28 @@ A takes two values according to excitatory or inhibitory neurons. But A is alway
                     ...
                 return self.rnncell.excitatory_outputs   
         
-## Code modification: Implementing Short Term Plasticity
+## Implementing Short Term Plasticity
+STP model follows equation
+
+$h_t = (1-z_h)h_{t-1}+z_h\odot \phi ((u_t\odot x_t \odot W)h_{t-1}+PX_t+b)$ where $\phi$ is Sigmoid() function. 
+
+$x_t = z_x + (1-z_x)x_{t-1}-(\delta t\odot u_t\odot x_{t-1})h_{t-1}$
+
+$u_t = Uz_u + (1-z_u)u_{t-1}+(\delta t\odot U\odot (1-u_{t-1}))h_{t-1}$
+
+We have dynamic $u_t$, $x_t$. $z_h$, $z_u$ and $z_x$ are fixed, trained parameters, which is constrained within $[0, 1]$ and optimised during training.
+
+
+For conductance model we have dynamic time constant $z_t$:
+
+$z_t^{i} = \delta t \times \phi (G_b^i+ \sum_{j} A_{ij}\left|W_{ij}  \right| r_j + \left|P_{in}\right|x_n)$
+
+We can take $z_t$ to preserve the feature of conductance-based model, while introducing the dynamically updated $u_t$ and $x_t$. We therefore have
+
+$h_t = (1-z_t)h_{t-1}+z_t\odot \phi ((u_t\odot x_t \odot W)h_{t-1}+PX_t+b)$
+
+This can be a possible way to combine these two models together.
+
 
 ## Further Investigation
 ### Use abs or Relu for constraints of Dale's principle?
