@@ -44,14 +44,14 @@ A takes two values according to excitatory or inhibitory neurons. But A is alway
 ## Code modification: Implementing Short Term Plasticity
 
 ## Further Investigation
-### use abs or Relu for constraints?
-Relu more solid to apply constraints, but clearing negative values to zero may slow down training.
+### Use abs or Relu for constraints of Dale's principle?
+Relu is more solid to apply constraints, but clearing negative values to zero may slow down training.
 We used abs for now.
 
 ### How would the tasks be used to examine working memory behaviour?
 - By using increasing number of sequence length (or we can say by using smaller input size), the task required longer working memory to memorize all the input sequences to perform the classification tasks. Therefore, the models' behaviour at very small input size is a strong evidence for the working memory of the model. Our results show that constant-A bRNN and matrix-A bRNN have much longer working memory than vanilla RNN, and they have comparable working memory to simple GRU.
-- 
-
+- By testing the model further through tasks with extreme long sequence length,(and check the decay in accuracy rate) we can see the working memory behaviour even clearer.
+- By tracking the change of $z_t$ and $r_t$ during training, we can observe the working memory behaviours: stable trajectories represent working memory and faster decay represent forgetting.
 
 
 ### Parameter tracking
@@ -73,13 +73,16 @@ Parameter examples:
 
 we discovered $w_r$ and $r_t$ are both very small, probably due to the constraints on scaling factors. Modifying that may improve the model performance. Check that!
 
-### Is optimisation algorithms like GA going the help the RNN structure?
+### (a new idea from lectures) Is optimisation algorithms like GA going the help the RNN structure?
 Genetic Algorithm can differ in performances from gradient basedd methods in many ways, and it can be used for parameter optimisation or optimisation of the whole structure. It also gives biological insights which in some senses 
 agrees with bRNN. For example for some parameters like values for scaling matrix $A$ and time increment $dt$ we can use GA to decide its value rather than trained using gradient optimisation. But it might have problems with complexity and 
 biological interpretations.
 
 
 ### Comparison of Model
-Accuracy of the model:37.72%
 
-Accuracy of the model:40.06%
+Before applying excitatory and inhibitory neurons: Accuracy of the model:40.06%
+
+After: Accuracy of the model:37.72%
+
+
