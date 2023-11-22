@@ -98,13 +98,13 @@ loaders
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 3*16
+input_size = 3*4
 sequence_length = 32*32*3//input_size
 hidden_size = 200
 num_layers = 1
 num_classes = 10
 batch_size = 100
-num_epochs = 10
+num_epochs = 2
 learning_rate = 0.01
 time_gap = 10
 
@@ -136,6 +136,9 @@ class customGRUCell(nn.Module):
         self.Sigmoid = nn.Sigmoid()
         self.Tanh = nn.Tanh()
         self.relu = nn.ReLU()
+
+        self.zt_history = []
+        self.ht_history = []
         for name, param in self.named_parameters():
             nn.init.uniform_(param, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
 
@@ -161,7 +164,10 @@ class customGRUCell(nn.Module):
         self.z_t = self.dt * self.Sigmoid(torch.matmul(w_z, torch.matmul(self.A,self.r_t)) + torch.matmul(p_z, x) + self.g_z)
         self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Sigmoid(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
         self.r_t = torch.transpose(self.r_t, 0, 1) 
-        print(self.A)
+
+        self.zt_history.append(self.z_t.detach().cpu().numpy())
+        self.ht_history.append(self.r_t.detach().cpu().numpy())
+
         # zero out inhibitory neurons for output
         excitatory_mask = self.w_r.data > 0  # Mask for excitatory cells
         excitatory_mask = excitatory_mask.any(dim=1).unsqueeze(0) # Match the shape of r_t
@@ -330,3 +336,18 @@ plt.show()
 
 # Save train accuracy
 np.save('constant_A_bRNN', train_acc)
+
+def plot_history(history, title):
+    plt.figure(figsize=(12, 6))
+    for t in range(history.shape[0]):
+        plt.plot(history[t], label=f'Time step {t}')
+    plt.xlabel('Units')
+    plt.ylabel('Value')
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+# Plot z_t and h_t histories
+plot_history(model.costumGRU.zt_history, 'Update Gate (z_t) over Time')
+plot_history(model.costumGRU.ht_history, 'Hidden State (h_t) over Time')
