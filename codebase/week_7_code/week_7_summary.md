@@ -120,4 +120,9 @@ Before applying excitatory and inhibitory neurons: Accuracy of the model:40.06%
 
 After: Accuracy of the model:37.72%
 
+### This week
+Implement the STP model and the new conductance model with excitatory and inhibitory features. ADD them to the accuracy comparison that we had.
+In the future: 
+We can crop the images(after training for 25%, erase the hidden state), or just only feed 25%, 50% etc. data to the model. Check how the accuracies decay for different models.
+
 
