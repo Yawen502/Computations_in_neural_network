@@ -1,5 +1,5 @@
 # Update Summary
-## Implementing excitatory and inhibitory neurons
+## Code modification: Implementing excitatory and inhibitory neurons
 ### Adding constraints to weight matrix $W$
 We ensure that $W$ always satisfies Dale's principle:
 
@@ -17,7 +17,9 @@ Tanh is changed to Sigmoid to ensure $r_t$ is always positive.
         self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Sigmoid(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
 
 ### Number of neurons doubled up
-### A depends on presynaptic neuron
+We use n=200 (a relatively large number) for preliminary testing
+
+### Scaling factor A depends on presynaptic neuron
 A takes two values according to excitatory or inhibitory neurons. But A is always positive.
 
 ### Only excitatory neurons give outputs
@@ -39,14 +41,17 @@ A takes two values according to excitatory or inhibitory neurons. But A is alway
                     ...
                 return self.rnncell.excitatory_outputs   
         
-## Implementing Short Term Plasticity
+## Code modification: Implementing Short Term Plasticity
 
-## New problems
+## Further Investigation
 ### use abs or Relu for constraints?
 Relu more solid to apply constraints, but clearing negative values to zero may slow down training.
 We used abs for now.
 
 ### How would the tasks be used to examine working memory behaviour?
+- By using increasing number of sequence length (or we can say by using smaller input size), the task required longer working memory to memorize all the input sequences to perform the classification tasks. Therefore, the models' behaviour at very small input size is a strong evidence for the working memory of the model. Our results show that constant-A bRNN and matrix-A bRNN have much longer working memory than vanilla RNN, and they have comparable working memory to simple GRU.
+- 
+
 
 
 ### Parameter tracking
@@ -69,10 +74,12 @@ Parameter examples:
 we discovered $w_r$ and $r_t$ are both very small, probably due to the constraints on scaling factors. Modifying that may improve the model performance. Check that!
 
 ### Is optimisation algorithms like GA going the help the RNN structure?
-GA can differ in performances from gradient basedd methods in many ways, and it can be used for parameter optimisation or optimisation of the whole structure. It also gives biological insights which in some senses 
+Genetic Algorithm can differ in performances from gradient basedd methods in many ways, and it can be used for parameter optimisation or optimisation of the whole structure. It also gives biological insights which in some senses 
 agrees with bRNN. For example for some parameters like values for scaling matrix $A$ and time increment $dt$ we can use GA to decide its value rather than trained using gradient optimisation. But it might have problems with complexity and 
 biological interpretations.
 
 
 ### Comparison of Model
 Accuracy of the model:37.72%
+
+Accuracy of the model:40.06%
