@@ -98,13 +98,13 @@ loaders
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 3*4
+input_size = 3*8
 sequence_length = 32*32*3//input_size
 hidden_size = 200
 num_layers = 1
 num_classes = 10
 batch_size = 100
-num_epochs = 1
+num_epochs = 10
 learning_rate = 0.01
 time_gap = 10
 
@@ -114,56 +114,60 @@ class customGRUCell(nn.Module):
         super(customGRUCell, self).__init__()
         self.hidden_size = hidden_size
     
-        # Rest gate r_t 
-        self.w_r = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
+        self.raw_w_r = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
+        self.w_r = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size), requires_grad = False)
         self.p_r = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))           
-        self.b_r = torch.nn.Parameter(torch.rand(self.hidden_size, 1))   
+        self.b_r = torch.nn.Parameter(torch.full((self.hidden_size, 1), -torch.log(torch.tensor(99.0))), requires_grad=True)
+
+        # Initialize b_r to be -log(99), so at steady state f.r. close to biological firing rate of 1Hz
 
         # Update gate z_t
         # Wz and Pz are defined in the forward function, as they take absolute values of W_r and P_r            
         self.g_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))           
 
         # Firing rate, Scaling factor and time step initialization
-        self.r_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
+        self.v_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
         self.excitatory_outputs = torch.zeros(1, self.hidden_size, dtype=torch.float32, requires_grad = False)
         # a and dt are fixed
-        self.a_excitatory = nn.Parameter(torch.tensor(0.5), requires_grad=True)
-        self.a_inhibitory = nn.Parameter(torch.tensor(0.5), requires_grad=True)
-        self.dt = nn.Parameter(torch.tensor(0.1), requires_grad = False)
+        self.a_excitatory = torch.nn.Parameter(torch.tensor(0.5), requires_grad=True)
+        self.a_inhibitory = torch.nn.Parameter(torch.tensor(0.5), requires_grad=True)
+        
+        self.dt = torch.nn.Parameter(torch.tensor(0.1), requires_grad = False)
         # dt is clamped between 0 and 1 to ensure it makes sense biologically
 
         # Nonlinear functions
         self.Sigmoid = nn.Sigmoid()
         self.Tanh = nn.Tanh()
         self.relu = nn.ReLU()
+        self.w_scale = 0.192
+        self.b = 10/ self.w_scale
 
         self.zt_history = []
         self.ht_history = []
         for name, param in self.named_parameters():
             nn.init.uniform_(param, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
+    @property
+    def r_t(self):
+        return self.Sigmoid(self.v_t)
 
     def forward(self, x):        
-        if self.r_t.dim() == 3:           
-            self.r_t = self.r_t[0]
-        with torch.no_grad():
-            self.w_r.data[:self.hidden_size//2, :self.hidden_size//2] = torch.abs(self.w_r.data[:self.hidden_size//2, :self.hidden_size//2])
-            self.w_r.data[self.hidden_size//2:, :self.hidden_size//2] = torch.abs(self.w_r.data[self.hidden_size//2:, :self.hidden_size//2])
-            self.w_r.data[:self.hidden_size//2, self.hidden_size//2:] = -torch.abs(self.w_r.data[:self.hidden_size//2, self.hidden_size//2:])
-            self.w_r.data[self.hidden_size//2:, self.hidden_size//2:] = -torch.abs(self.w_r.data[self.hidden_size//2:, self.hidden_size//2:])
-        self.r_t = torch.transpose(self.r_t, 0, 1)
+        if self.v_t.dim() == 3:           
+            self.v_t = self.v_t[0]
+
+        self.w_r.data[:self.hidden_size//2, :self.hidden_size//2] = 1/self.b *torch.log(torch.cosh(self.b*(self.raw_w_r.data[:self.hidden_size//2, :self.hidden_size//2])))
+        self.w_r.data[self.hidden_size//2:, :self.hidden_size//2] = 1/self.b *torch.log(torch.cosh(self.b*(self.raw_w_r.data[self.hidden_size//2:, :self.hidden_size//2])))
+        self.w_r.data[:self.hidden_size//2, self.hidden_size//2:] = 1/self.b *torch.log(torch.cosh(self.b*(self.raw_w_r.data[:self.hidden_size//2, self.hidden_size//2:])))
+        self.w_r.data[self.hidden_size//2:, self.hidden_size//2:] = 1/self.b *torch.log(torch.cosh(self.b*(self.raw_w_r.data[self.hidden_size//2:, self.hidden_size//2:])))
+        self.v_t = torch.transpose(self.v_t, 0, 1)
         # Apply constraints to follow Dale's principle
         w_z = torch.abs(self.w_r)
-
-
-        # determine A based on the sign of w_r
-        is_excitatory = self.w_r.data > 0  
-        a = torch.where(is_excitatory, self.a_excitatory, self.a_inhibitory)
-        self.A = 10 * self.Sigmoid(a)
-        self.A = self.A.transpose(0, 1)
+        self.a = torch.cat((self.a_excitatory.repeat(self.hidden_size//2, 1), self.a_inhibitory.repeat(self.hidden_size//2, 1)))
+        # determine A based on the sign of w_r 
+        self.A = 10 * self.Sigmoid(self.a)
         p_z = torch.abs(self.p_r)
-        self.z_t = self.dt * self.Sigmoid(torch.matmul(w_z, torch.matmul(self.A,self.r_t)) + torch.matmul(p_z, x) + self.g_z)
-        self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Sigmoid(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
-        self.r_t = torch.transpose(self.r_t, 0, 1) 
+        self.z_t = self.dt * self.Sigmoid(torch.matmul(w_z, self.A*self.r_t) + torch.matmul(p_z, x) + self.g_z)
+        self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
+        self.v_t = torch.transpose(self.v_t, 0, 1) 
 
         self.zt_history.append(self.z_t.detach().cpu().numpy())
         self.ht_history.append(self.r_t.detach().cpu().numpy())
@@ -171,7 +175,7 @@ class customGRUCell(nn.Module):
         # zero out inhibitory neurons for output
         excitatory_mask = self.w_r.data > 0  # Mask for excitatory cells
         excitatory_mask = excitatory_mask.any(dim=1).unsqueeze(0) # Match the shape of r_t
-        self.excitatory_outputs = self.r_t * excitatory_mask
+        self.excitatory_outputs = self.v_t * excitatory_mask
 
                       
 
@@ -202,7 +206,7 @@ class RNN(nn.Module):
 
     def forward(self, x):
         # Set initial hidden and cell states 
-        self.lstm.rnncell.r_t = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device) 
+        self.lstm.rnncell.v_t = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device) 
         #c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         # Passing in the input and hidden state into the model and  obtaining outputs
         out = self.lstm(x)  # out: tensor of shape (batch_size, seq_length, hidden_size)
@@ -334,24 +338,4 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
-# Save train accuracy
-np.save('constant_A_bRNN', train_acc)
-'''
-def plot_history(history, title):
-    plt.figure(figsize=(12, 6))
-    for t in range(history.shape[0]):
-        plt.plot(history[t], label=f'Time step {t}')
-    plt.xlabel('Units')
-    plt.ylabel('Value')
-    plt.title(title)
-    plt.legend()
-    plt.grid(True)
-    plt.show()
 
-# Plot z_t and h_t histories
-plot_history(model.lstm.rnncell.zt_history, 'Update Gate (z_t) over Time')
-plot_history(model.lstm.rnncell.ht_history, 'Firing Rate (h_t) over Time')'''
-
-# check root mean square of w_r
-w_r = model.lstm.rnncell.w_r.detach().cpu().numpy()
-print("Root mean square of w_r", np.sqrt(np.mean(w_r**2)))
