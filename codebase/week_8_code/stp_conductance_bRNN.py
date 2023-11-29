@@ -204,7 +204,7 @@ class customGRUCell(nn.Module):
         if self.v_t.dim() == 3:
                 self.v_t = self.v_t[0]    
         self.v_t = torch.transpose(self.v_t, 0, 1)
-        print("v_t", self.v_t.size())
+        #print("v_t", self.v_t.size())
         # Apply constraints to follow Dale's principle        
         self.w_r.data[:self.hidden_size//2, :self.hidden_size//2] = 1/self.b *torch.log(torch.cosh(self.b*(self.raw_w_r.data[:self.hidden_size//2, :self.hidden_size//2])))
         self.w_r.data[self.hidden_size//2:, :self.hidden_size//2] = 1/self.b *torch.log(torch.cosh(self.b*(self.raw_w_r.data[self.hidden_size//2:, :self.hidden_size//2])))
@@ -238,12 +238,12 @@ class customGRUCell(nn.Module):
             self.z_t = self.dt * self.Sigmoid(torch.matmul(w_z, self.A*self.r_t) + torch.matmul(p_z, x) + self.g_z)
             # Voltage update after both conductance and STP updates
             self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.X*self.U*self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
-            print("v_t", self.v_t.size())
+            self.v_t = self.v_t[0]
             self.v_t = torch.transpose(self.v_t, 0, 1) 
             # zero out inhibitory neurons for output
             excitatory_mask = self.w_r.data > 0  # Mask for excitatory cells
             excitatory_mask = excitatory_mask.any(dim=1).unsqueeze(0) # Match the shape of r_t
-            print("excitatory mask", excitatory_mask.size())
+            #print("excitatory mask", excitatory_mask.size())
             self.excitatory_outputs = self.v_t * excitatory_mask
 
         if self.complexity == "poor":
