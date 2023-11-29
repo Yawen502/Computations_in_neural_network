@@ -153,7 +153,7 @@ class customGRUCell(nn.Module):
     def forward(self, x):        
         if self.v_t.dim() == 3:           
             self.v_t = self.v_t[0]
-
+        print("v_t", self.v_t.size())
         self.w_r.data[:self.hidden_size//2, :self.hidden_size//2] = 1/self.b *torch.log(torch.cosh(self.b*(self.raw_w_r.data[:self.hidden_size//2, :self.hidden_size//2])))
         self.w_r.data[self.hidden_size//2:, :self.hidden_size//2] = 1/self.b *torch.log(torch.cosh(self.b*(self.raw_w_r.data[self.hidden_size//2:, :self.hidden_size//2])))
         self.w_r.data[:self.hidden_size//2, self.hidden_size//2:] = 1/self.b *torch.log(torch.cosh(self.b*(self.raw_w_r.data[:self.hidden_size//2, self.hidden_size//2:])))
@@ -166,6 +166,17 @@ class customGRUCell(nn.Module):
         self.A = 10 * self.Sigmoid(self.a)
         p_z = torch.abs(self.p_r)
         self.z_t = self.dt * self.Sigmoid(torch.matmul(w_z, self.A*self.r_t) + torch.matmul(p_z, x) + self.g_z)
+        # Print the dimension of every tensor
+        '''
+        print("z_t", self.z_t.size())
+        print("v_t", self.v_t.size())
+        print("r_t", self.r_t.size())        
+        print("w_r", self.w_r.size())
+        print("p_r", self.p_r.size())
+        print('x', x.size())
+        print("b_r", self.b_r.size())
+        print("g_z", self.g_z.size())
+        '''
         self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
         self.v_t = torch.transpose(self.v_t, 0, 1) 
 

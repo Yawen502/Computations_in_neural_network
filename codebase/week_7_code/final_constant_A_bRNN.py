@@ -165,10 +165,10 @@ class customGRUCell(nn.Module):
         # determine A based on the sign of w_r 
         self.A = 10 * self.Sigmoid(self.a)
         p_z = torch.abs(self.p_r)
+
         self.z_t = self.dt * self.Sigmoid(torch.matmul(w_z, self.A*self.r_t) + torch.matmul(p_z, x) + self.g_z)
         self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
         self.v_t = torch.transpose(self.v_t, 0, 1) 
-
         self.zt_history.append(self.z_t.detach().cpu().numpy())
         self.ht_history.append(self.r_t.detach().cpu().numpy())
 
