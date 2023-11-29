@@ -34,7 +34,9 @@ Other equations stay the same, but we now have
 $\boldsymbol{V}_{t+1} = (1-\boldsymbol{z}_t)\odot \boldsymbol{V}_t  + \delta t \, W (\boldsymbol{u}_t\odot \boldsymbol{x}_t \odot \boldsymbol{r}_t) + \delta t P\boldsymbol{x_t}$
 
 #### Progress
-Implemented the code, dimension check done. However I got an OutOfMemoryError.
+Implemented the code, dimension check done. However, I got out of memory error:
+
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 16.00 MiB (GPU 0; 8.00 GiB total capacity; 21.59 GiB already allocated; 0 bytes free; 21.61 GiB reserved in total by PyTorch) If reserved memory is >> allocated memory try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF
 
 #### Next step
 Check for improvement in memory storage.
