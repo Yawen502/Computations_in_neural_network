@@ -68,14 +68,14 @@ transform = transforms.Compose([
 train_data = datasets.CIFAR10(
     root = 'data',
     train = True,
-    download = False,
+    download = True,
     transform = transform
 )
 
 test_data = datasets.CIFAR10(
     root = 'data',
     train = False,
-    download = False,
+    download = True,
     transform = transform
 )
 
