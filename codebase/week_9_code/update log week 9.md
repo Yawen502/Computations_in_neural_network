@@ -27,9 +27,11 @@ We do not consider the combination of Dales' law and non-constant A (literature 
 - simple GRU
 - full GRU
 - vanilla RNN
-- STP model
-- CBRNN(3 types)
-- PSTP
+- STP
+- DaleCB(2 cases) CA/MA
+- CB(2 cases) CA/MA
+- STPDaleCB, STPCB
+- SSTP (we're not going to do it)
 
 Think of a good presentation form of the graph, try to make it not too busy.
 Do some summary plots in other forms e.g. bar plot
