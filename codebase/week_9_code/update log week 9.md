@@ -2,7 +2,7 @@ Week 8 meeting notes:
 
 Get familiar and do some run with SSH server. (Done)
 
-We can crop the images(after training for 25%, erase the hidden state), or just only feed 25%, 50% etc. data to the model. Check how the accuracies decay for different models. (working memory test) Let’s say we use constant A bRNN, matrix A bRNN and vanilla and simple GRU for this one (1 hour)
+We can crop the images(after training for 25%, erase the hidden state), or just only feed 25%, 50% etc. data to the model. Check how the accuracies decay for different models. (working memory test) Let’s say we use constant A bRNN, matrix A bRNN and vanilla and simple GRU for this one.
 
 Separate dimensions:
 
