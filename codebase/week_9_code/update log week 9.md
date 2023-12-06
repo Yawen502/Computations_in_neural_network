@@ -2,7 +2,7 @@
 
 ### Get familiar and do some trials with SSH server.
 
-### working memory best
+### working memory test
 We can crop the images(after training for 25%, erase the hidden state). Check how the accuracies decay for different models. (working memory test) 
 Let’s say we use constant A bRNN, matrix A bRNN and vanilla and simple GRU for this one.![image](https://github.com/Yawen502/Computations_in_neural_network/assets/71087503/7aab119b-137c-4974-9454-388a111b9382)
 
@@ -22,7 +22,7 @@ We do not consider the combination of Dales' law and non-constant A (literature 
 
 ### Do a MNIST test in fixed random order (random permutation)
 
-Do a comparison graph:
+### Do a comparison graph:
 
 - simple GRU
 - full GRU
@@ -32,13 +32,4 @@ Do a comparison graph:
 - PSTP
 
 Think of a good presentation form of the graph, try to make it not too busy.
-
-Make a collection of all, then also
-
-comparison between CBRNNs
-
-take the best-performing ones
-
-take the most biological ones
-
 Do some summary plots in other forms e.g. bar plot
