@@ -14,6 +14,7 @@ A_{ij} vs constant A
 2. do all of them except for Dales’, non-constant A
 
 Try PSTP and see whether it has a memory problem. 
+- no memory problem, accuracy decreases compared to the other models.
 
 Do a MNIST test in fixed random order (random permutation)
 
