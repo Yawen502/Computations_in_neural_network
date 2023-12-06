@@ -160,7 +160,6 @@ class customGRUCell(nn.Module):
             self.c_U = torch.nn.Parameter(torch.rand(self.hidden_size, 1))
             
             # State initialisations
-            self.r_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
             self.X = torch.ones(self.hidden_size, 1, dtype=torch.float32)
             self.U = torch.full((self.hidden_size, 1), 0.9, dtype=torch.float32)   
             self.Ucap = 0.9 * self.Sigmoid(self.c_U)
@@ -252,21 +251,17 @@ class customGRUCell(nn.Module):
             
             # Short term Depression 
             self.z_x = self.z_min + (self.z_max - self.z_min) * sigmoid(self.c_x)
-
-            a = self.delta_t * self.U * self.X * self.h_t
-
-        
-            self.X = self.z_x + torch.mul((1 - self.z_x), self.X) - self.delta_t * self.U * self.X * self.h_t
+            self.X = self.z_x + torch.mul((1 - self.z_x), self.X) - self.delta_t * self.U * self.X * self.r_t
 
             # Short term Facilitation 
             self.z_u = self.z_min + (self.z_max - self.z_min) * sigmoid(self.c_u)    
             self.Ucap = 0.9 * sigmoid(self.c_U)
-            self.U = self.Ucap * self.z_u + torch.mul((1 - self.z_u), self.U) + self.delta_t * self.Ucap * (1 - self.U) * self.h_t
+            self.U = self.Ucap * self.z_u + torch.mul((1 - self.z_u), self.U) + self.delta_t * self.Ucap * (1 - self.U) * self.r_t
             self.Ucapclone = self.Ucap.clone().detach()
             self.U = torch.clamp(self.U, min=self.Ucapclone.repeat(1, x.size(0)).to(device), max=torch.ones_like(self.Ucapclone.repeat(1, x.size(0)).to(device)))
-
+            x = torch.transpose(x, 0, 1)
             # Update gate z_t
-            self.z_t = self.dt * sigmoid(torch.matmul(w_z, self.A*self.h_t) + torch.matmul(p_z, x) + self.g_z)
+            self.z_t = self.dt * sigmoid(torch.matmul(w_z, self.A*self.r_t) + torch.matmul(p_z, x) + self.g_z)
             # Voltage update after both conductance and STP updates
             self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.w_r, self.U*self.X*self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
             self.v_t = torch.transpose(self.v_t, 0, 1) 
@@ -321,7 +316,7 @@ class RNN(nn.Module):
         
         pass                                    
 pass
-model = RNN(input_size, hidden_size, 'rich', num_layers, num_classes).to(device)
+model = RNN(input_size, hidden_size, 'poor', num_layers, num_classes).to(device)
 print(model)
 loss_func = nn.CrossEntropyLoss()
 
@@ -386,8 +381,8 @@ def train(num_epochs, model, loaders, patience=5, min_delta=0.01):
             model.train()
             # Forward pass
             outputs = model(images)
-            print("outputs", outputs.size())
-            print("labels", labels.size())
+            #print("outputs", outputs.size())
+            #print("labels", labels.size())
             loss = loss_func(outputs, labels)
 
             # Backward and optimize
