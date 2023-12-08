@@ -27,10 +27,10 @@ We do not consider the combination of Dales' law and non-constant A (literature 
 - simple GRU
 - full GRU
 - vanilla RNN
-- STP
-- DaleCB(2 cases) CA/MA
-- CB(2 cases) CA/MA
-- STPDaleCB, STPCB
+- STP nonDale/Dale (MA)
+- DaleCB MA only
+- CB, CB-GRU refer to overleaf equation (40)
+- STPDaleCB MA
 - SSTP (we're not going to do it)
 
 Think of a good presentation form of the graph, try to make it not too busy.
