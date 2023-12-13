@@ -1,14 +1,13 @@
 # Week 10 update log and Summary
 
 Do a comparison graph:
-- simple GRU
-- full GRU
-- vanilla RNN
-- STP
-- DaleCB(2 cases) CA/MA
-- CB(2 cases) CA/MA
-- STPDaleCB, STPCB
-- SSTP (we're not going to do it)
+- simple GRU /
+- full GRU /
+- vanilla RNN /
+- STP nonDale/Dale (MA)
+- DaleCB MA only
+- CB, CB-GRU refer to overleaf equation (40) /
+- STPDaleCB MA
 
 Think of a good presentation form of the graph, try to make it not too busy. Do some summary plots in other forms e.g. bar plot
 
