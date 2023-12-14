@@ -8,14 +8,41 @@ Do a comparison graph:
 - STPDaleCB
 - DaleCB
 - CB-GRU refer to overleaf equation
-- CB
+
 
 Think of a good presentation form of the graph, try to make it not too busy. Do some summary plots in other forms e.g. bar plot
+## Implementing stride
+
+(It seems the for loop is slowing down the training process, but I haven't figured out a neat way to eliminate it. Also it is still bearable...)
+
+                def stride(input_data, stride):
+                    'turn [batch_size, sequence_length, input_size] into [batch_size, sequence_length*input_size/stride, input_size]'
+                    batch_size, sequence_length, input_size = input_data.shape
+                    # flatten the input data to put sequence and input size together
+                    input_data = input_data.reshape(batch_size, -1)
+                    # append zeros to make sure the last pixel can be fed as the first pixel of the next sequence
+                    n = input_size - (sequence_length*input_size)%stride
+                
+                    input_data = input_data.cpu()
+                    input_data = input_data.numpy()
+                    input_data = np.append(input_data, np.zeros((batch_size, n)), axis=1)
+                    input_data = torch.tensor(input_data)
+                    #print(input_data.shape)
+                    output_data = torch.zeros(batch_size, sequence_length*input_size//stride, input_size)
+                    for i in range(sequence_length*input_size//stride):
+                        # if stride = input size, then the output data is the same as input data
+                        #print(i)
+                
+                        output_data[:,i,:] = input_data[:,i*stride:i*stride+input_size]
+                        #print(output_data[batch,i,:])
+                
+                    return output_data
+
 
 ## Value updates
 reduce batch size to 40 (lower batch size takes too long to train)
 
-reduce validation to 2 times per epoch or so(read through the website)
+reduce validation to 2 times per epoch
 
 working memory: examine conductance variations over time. We can examine either parameters or dynamic variables
 
@@ -26,6 +53,17 @@ implement stride and use stride less than half of the input length
 we can use 2 conventions of stride, 1. **always 4 (for cifar that is 12)** 2. **half of the input length**
 stride = 4, with input length (4, 8 and 16)
 decide between permuted MNIST and CIFAR( which is easier): CIFAR
+
+        input_size = 16
+        sequence_length = 28*28//input_size
+        hidden_size = 48
+        num_layers = 1
+        num_classes = 10
+        batch_size = 40
+        num_epochs = 10
+        learning_rate = 0.01
+        stride_number = 4
+        print('input size:', input_size)
 
 ## Model Updates:
 We have discussed in last meeting to replace W and A with K and the reversal potentials. Essentially we no longer have the conductance model, but the conductance-based AND current-based model.
@@ -95,3 +133,18 @@ Compare this with simple GRU:
 
         self.z_t = self.Sigmoid(torch.matmul(self.w_z, self.r_t) + torch.matmul(self.p_z, x) + self.b_z)
         self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Sigmoid(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
+
+## Problems
+#### DaleCB cannot perform better than Vanilla, which is quite counterintuitive
+
+#### The trend of performance of network with respect to input size is not very consistent for different networks
+
+#### Large variance for each trail. Should probably train several times and take (the best/average)?
+
+
+## Conclusion
+- We should also look into CB-GRU with no sign constraints, but no STP and no Dale?
+
+- Check what is wrong with DaleCB. Although we have the Dale constraints, with the current and conductance-based feature we should still have at least 25-35% like performance from expectation. Also we're using small hidden size, so that might be an issue -- I'm using same hidden size for Dale and nonDale model, which might not be fair.
+
+- STP nonDale and STPDale both perform well, and as Dale is introducing constraints it is not strange that the nonDale model outperforms. STPDale's model proves that with a large degree of biological features, the model perform well. 
