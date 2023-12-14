@@ -86,7 +86,7 @@ test_data = datasets.MNIST(
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 16
+input_size = 4
 sequence_length = 28*28//input_size
 hidden_size = 24
 num_layers = 1
@@ -95,6 +95,7 @@ batch_size = 40
 num_epochs = 10
 learning_rate = 0.01
 stride_number = 4
+print('input size:', input_size)
 
 from torch.utils.data import DataLoader
 loaders = {

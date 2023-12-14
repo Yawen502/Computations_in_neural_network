@@ -94,6 +94,7 @@ batch_size = 40
 num_epochs = 10
 learning_rate = 0.01
 stride_number = 4
+print('input size:', input_size)
 
 from torch.utils.data import DataLoader
 loaders = {
@@ -337,5 +338,5 @@ with open('result.csv', 'a') as f:
 
 # stride length 4
 # input length 4, Accuracy of the model:
-# input length 8, Accuracy of the model:16.35%
+# input length 8, Accuracy of the model:
 # input length 12, Accuracy of the model:

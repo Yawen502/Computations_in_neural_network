@@ -94,6 +94,7 @@ batch_size = 40
 num_epochs = 10
 learning_rate = 0.01
 stride_number = 4
+print('input size:', input_size)
 
 from torch.utils.data import DataLoader
 loaders = {
