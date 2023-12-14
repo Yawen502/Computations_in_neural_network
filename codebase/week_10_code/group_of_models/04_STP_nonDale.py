@@ -216,7 +216,7 @@ class customGRUCell(nn.Module):
         # Apply constraints to follow Dale's principle
         # w_r and k are indepedent and always positive
         # determine A based on the sign of w_r 
-                    
+        K = torch.exp(self.K)
         # STP model updates
         if self.complexity == "rich":
             # Short term Depression 
@@ -232,7 +232,7 @@ class customGRUCell(nn.Module):
             
 
             # Update gate z_t
-            self.z_t = self.dt * self.Sigmoid(torch.matmul(self.K, self.r_t) + torch.matmul(self.p_z, x) + self.g_z)
+            self.z_t = self.dt * self.Sigmoid(torch.matmul(K, self.r_t) + torch.matmul(self.p_z, x) + self.g_z)
             # Voltage update after both conductance and STP updates
             self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.X*self.U*self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
             self.v_t = self.v_t[0]
@@ -255,7 +255,7 @@ class customGRUCell(nn.Module):
             self.U = torch.clamp(self.U, min=self.Ucapclone.repeat(1, x.size(0)).to(device), max=torch.ones_like(self.Ucapclone.repeat(1, x.size(0)).to(device)))
             x = torch.transpose(x, 0, 1)
             # Update gate z_t
-            self.z_t = self.dt * sigmoid(torch.matmul(self.K, self.r_t) + torch.matmul(self.p_z, x) + self.g_z)
+            self.z_t = self.dt * sigmoid(torch.matmul(K, self.r_t) + torch.matmul(self.p_z, x) + self.g_z)
             # Voltage update after both conductance and STP updates
             self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.w_r, self.U*self.X*self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
             self.v_t = torch.transpose(self.v_t, 0, 1) 
