@@ -11,7 +11,7 @@ import numpy as np
 - vanilla RNN
 '''
 # Define the models and their performance for each input situation
-models = ['Full GRU', 'Simple GRU', 'CB-GRU', 'STPCB', 'DaleCB', 'STPDaleCB', 'Vanilla RNN']
+models = ['Full GRU', 'Simple GRU', 'CB-GRU', 'STPnonDale', 'STPDale', 'Dale','Vanilla RNN']
 input_situations = [4, 8, 16]
 performance = np.random.rand(len(models), len(input_situations))
 # 01 Full GRU
@@ -21,12 +21,12 @@ performance[1,:] = [89.72, 89.59, 91.71]
 # 03 CB-GRU
 performance[2,:] = [85.0, 79.69, 80.45]
 # 04 STPnonDaleCB
-performance[3,:] = [ , 73.78, 51.69]
+performance[3,:] = [70.7 , 73.78, 51.69]
 
 # 05 STPDaleCB
-performance[4,:] = [46.5,,]
+performance[4,:] = [46.5, 36.90 ,68.22]
 # 06 DaleCB
-performance[4,:] = [ , , ]
+performance[5,:] = [ 14.11, 9.8, 9.8 ]
 # 07 Vanilla RNN
 performance[6,:] = [9.58, 18.13, 9.8]
 # Set the width of each bar

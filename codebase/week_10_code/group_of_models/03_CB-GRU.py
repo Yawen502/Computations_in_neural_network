@@ -316,5 +316,5 @@ print('Accuracy of the model:{}%'.format(test_acc))
 
 # stride length 4
 # input length 4, Accuracy of the model:85.0%
-# input length 8, Accuracy of the model: 79.69%
+# input length 8, Accuracy of the model:79.69%
 # input length 12, Accuracy of the model:80.45%

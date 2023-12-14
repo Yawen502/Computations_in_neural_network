@@ -85,9 +85,9 @@ test_data = datasets.MNIST(
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 4
+input_size = 16
 sequence_length = 28*28//input_size
-hidden_size = 24
+hidden_size = 48
 num_layers = 1
 num_classes = 10
 batch_size = 40
@@ -139,6 +139,7 @@ class customGRUCell(nn.Module):
         self.v_e = torch.nn.Parameter(torch.tensor(1.0))
         self.v_i = torch.nn.Parameter(torch.tensor(1.0))
         self.dt = torch.nn.Parameter(torch.tensor(0.1), requires_grad = False)
+        self.p_z = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))
 
         # Firing rate, Scaling factor and time step initialization
         self.v_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
@@ -164,13 +165,12 @@ class customGRUCell(nn.Module):
         # Apply constraints to follow Dale's principle
         K= torch.exp(self.K)
         C= torch.exp(self.C)
-        rho = K/(K+C)
+        p_z = torch.exp(self.p_z)
         v_e = torch.exp(self.v_e)
         v_i = -torch.exp(self.v_i)
         W_E = v_e * (K[:, :self.hidden_size//2] + C[:, :self.hidden_size//2])
         W_I = v_i * (K[:, self.hidden_size//2:] + C[:, self.hidden_size//2:])
         W = torch.cat((W_E, W_I), dim=1)
-        p_z = torch.exp(self.p_r)
 
         self.z_t = self.dt * self.Sigmoid(torch.matmul(K, self.r_t)) + torch.matmul(p_z, x) + self.g_z
         self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(W, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
