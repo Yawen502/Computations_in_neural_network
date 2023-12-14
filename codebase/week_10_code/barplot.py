@@ -14,19 +14,20 @@ import numpy as np
 models = ['Full GRU', 'Simple GRU', 'CB-GRU', 'STPCB', 'DaleCB', 'STPDaleCB', 'Vanilla RNN']
 input_situations = [4, 8, 16]
 performance = np.random.rand(len(models), len(input_situations))
-# Full GRU
+# 01 Full GRU
 performance[0,:] = [88.74, 87.28, 92.32]
-# Simple GRU
+# 02 Simple GRU
 performance[1,:] = [89.72, 89.59, 91.71]
-# CB-GRU
+# 03 CB-GRU
 performance[2,:] = [85.0, 79.69, 80.45]
-# STPCB
+# 04 STPnonDaleCB
 performance[3,:] = [ , 73.78, 51.69]
-# DaleCB
-#performance[4,:] = [ p, 16.35, v]
-# STPDaleCB
-performance[5,:] = [46.5,,]
-# Vanilla RNN
+
+# 05 STPDaleCB
+performance[4,:] = [46.5,,]
+# 06 DaleCB
+performance[4,:] = [ , , ]
+# 07 Vanilla RNN
 performance[6,:] = [9.58, 18.13, 9.8]
 # Set the width of each bar
 bar_width = 0.2
