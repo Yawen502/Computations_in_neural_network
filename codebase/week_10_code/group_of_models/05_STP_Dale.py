@@ -139,24 +139,6 @@ class customGRUCell(nn.Module):
 
 
         # STP model initialisations
-        if self.complexity == "rich":
-            # Short term Plasticity variables 
-            self.delta_t = 1
-            self.z_min = 0.001
-            self.z_max = 0.1
-
-            # Short term Depression parameters  
-            self.c_x = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
-
-            # Short term Facilitation parameters
-            self.c_u = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
-            self.c_U = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
-            
-            # State initialisations
-            self.X = torch.ones(self.hidden_size, self.hidden_size, dtype=torch.float32)     
-            self.U = torch.full((self.hidden_size, self.hidden_size), 0.9, dtype=torch.float32)         
-            self.Ucap = 0.9 * self.Sigmoid(self.c_U)
-            self.Ucapclone = self.Ucap.clone().detach()
 
         if self.complexity == "poor":
             # Short term Plasticity variables 
@@ -182,6 +164,7 @@ class customGRUCell(nn.Module):
         # Update gate z_t
         # Wz is defined in the forward function
         self.g_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))    
+        self.p_z = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))
         self.K = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
         self.C = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
         # v_e and v_i are constant
@@ -209,43 +192,15 @@ class customGRUCell(nn.Module):
         # Apply constraints to follow Dale's principle
         K= torch.exp(self.K)
         C= torch.exp(self.C)
+        p_z = torch.exp(self.p_z)
         v_e = torch.exp(self.v_e)
         v_i = -torch.exp(self.v_i)
         W_E = v_e * (K[:, :self.hidden_size//2] + C[:, :self.hidden_size//2])
         W_I = v_i * (K[:, self.hidden_size//2:] + C[:, self.hidden_size//2:])
         self.W = torch.cat((W_E, W_I), dim=1)
-        p_z = torch.exp(self.p_r)
-
-        self.z_t = self.dt * self.Sigmoid(torch.matmul(K, self.r_t)) + torch.matmul(p_z, x) + self.g_z
-        self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.W, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
-        self.v_t = torch.transpose(self.v_t, 0, 1) 
 
 
         # STP model updates
-        if self.complexity == "rich":
-            # Short term Depression 
-            self.z_x = self.z_min + (self.z_max - self.z_min) * self.Sigmoid(self.c_x)
-            self.X = self.z_x + torch.mul((1 - self.z_x), self.X) - self.delta_t * self.U * torch.einsum("ijk, ji  -> ijk", self.X, self.r_t)
-
-            # Short term Facilitation 
-            self.z_u = self.z_min + (self.z_max - self.z_min) * self.Sigmoid(self.c_u)    
-            self.Ucap = 0.9 * self.Sigmoid(self.c_U)
-            self.U = self.Ucap * self.z_u + torch.mul((1 - self.z_u), self.U) + self.delta_t * self.Ucap * torch.einsum("ijk, ji  -> ijk", (1 - self.U), self.r_t)
-            self.Ucapclone = self.Ucap.clone().detach() 
-            self.U = torch.clamp(self.U, min=self.Ucapclone.repeat(self.U.size(0), 1, 1).to(device), max=torch.ones_like(self.Ucapclone.repeat(self.U.size(0), 1, 1).to(device)))
-            
-
-            # Update gate z_t
-            self.z_t = self.dt * self.Sigmoid(torch.matmul(K, *self.r_t) + torch.matmul(p_z, x) + self.g_z)
-            # Voltage update after both conductance and STP updates
-            self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.X*self.U*self.W, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
-            self.v_t = self.v_t[0]
-            self.v_t = torch.transpose(self.v_t, 0, 1) 
-            # zero out inhibitory neurons for output
-            # zero out inhibitory neurons for output
-            excitatory_mask = self.W[:, :self.hidden_size//2]
-            excitatory_mask = excitatory_mask.any(dim=1).unsqueeze(0) # Match the shape of r_t
-            self.excitatory_outputs = self.v_t * excitatory_mask
 
         if self.complexity == "poor":
             x = torch.transpose(x, 0, 1)
@@ -289,19 +244,21 @@ class customGRU(nn.Module):
             
 class RNN(nn.Module):
     
-    def __init__(self, input_size, hidden_size, num_layers, num_classes):
+    def __init__(self, input_size, hidden_size, complexity, num_layers, num_classes):
         super(RNN, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.lstm = customGRU(input_size, hidden_size, num_layers)
+        self.lstm = customGRU(input_size, hidden_size, complexity, num_layers)
         self.fc = nn.Linear(hidden_size, 10)
         pass
 
     def forward(self, x):
         # Set initial hidden and cell states 
-        self.lstm.rnncell.v_t = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device) 
-        #c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
-        # Passing in the input and hidden state into the model and  obtaining outputs
+        if self.lstm.rnncell.complexity == "poor":
+            self.lstm.rnncell.X = torch.ones(self.hidden_size, x.size(0), dtype=torch.float32).to(device)
+            self.lstm.rnncell.U = (self.lstm.rnncell.Ucapclone.repeat(1, x.size(0))).to(device)
+            self.lstm.rnncell.v_t = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device) 
+            # Passing in the input and hidden state into the model and  obtaining outputs
         out = self.lstm(x)  # out: tensor of shape (batch_size, seq_length, hidden_size)
         #Reshaping the outputs such that it can be fit into the fully connected layer
         out = self.fc(out)

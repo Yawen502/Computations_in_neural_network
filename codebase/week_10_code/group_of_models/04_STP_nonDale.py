@@ -86,7 +86,7 @@ test_data = datasets.MNIST(
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 16
+input_size = 8
 sequence_length = 28*28//input_size
 hidden_size = 24
 num_layers = 1
@@ -140,6 +140,7 @@ class customGRUCell(nn.Module):
 
 
         # STP model initialisations
+        '''
         if self.complexity == "rich":
             # Short term Plasticity variables 
             self.delta_t = 1
@@ -158,7 +159,7 @@ class customGRUCell(nn.Module):
             self.U = torch.full((self.hidden_size, self.hidden_size), 0.9, dtype=torch.float32)         
             self.Ucap = 0.9 * self.Sigmoid(self.c_U)
             self.Ucapclone = self.Ucap.clone().detach()
-
+'''
         if self.complexity == "poor":
             # Short term Plasticity variables 
             self.delta_t = 1
@@ -217,7 +218,9 @@ class customGRUCell(nn.Module):
         # w_r and k are indepedent and always positive
         # determine A based on the sign of w_r 
         K = torch.exp(self.K)
+        p_z = torch.exp(self.p_z)
         # STP model updates
+        '''
         if self.complexity == "rich":
             # Short term Depression 
             self.z_x = self.z_min + (self.z_max - self.z_min) * self.Sigmoid(self.c_x)
@@ -232,13 +235,13 @@ class customGRUCell(nn.Module):
             
 
             # Update gate z_t
-            self.z_t = self.dt * self.Sigmoid(torch.matmul(K, self.r_t) + torch.matmul(self.p_z, x) + self.g_z)
+            self.z_t = self.dt * self.Sigmoid(torch.matmul(K, self.r_t) + torch.matmul(p_z, x) + self.g_z)
             # Voltage update after both conductance and STP updates
             self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.X*self.U*self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
             self.v_t = self.v_t[0]
             self.v_t = torch.transpose(self.v_t, 0, 1) 
 
-
+            '''
         if self.complexity == "poor":
             x = torch.transpose(x, 0, 1)
             sigmoid = nn.Sigmoid()
@@ -255,7 +258,7 @@ class customGRUCell(nn.Module):
             self.U = torch.clamp(self.U, min=self.Ucapclone.repeat(1, x.size(0)).to(device), max=torch.ones_like(self.Ucapclone.repeat(1, x.size(0)).to(device)))
             x = torch.transpose(x, 0, 1)
             # Update gate z_t
-            self.z_t = self.dt * sigmoid(torch.matmul(K, self.r_t) + torch.matmul(self.p_z, x) + self.g_z)
+            self.z_t = self.dt * sigmoid(torch.matmul(K, self.r_t) + torch.matmul(p_z, x) + self.g_z)
             # Voltage update after both conductance and STP updates
             self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.w_r, self.U*self.X*self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
             self.v_t = torch.transpose(self.v_t, 0, 1) 
@@ -289,11 +292,13 @@ class RNN(nn.Module):
         pass
 
     def forward(self, x):
-        # Set initial hidden and cell states 
+        # Set initial hidden and cell states
+        ''' 
         if self.lstm.rnncell.complexity == "rich":
             self.lstm.rnncell.X = torch.ones(x.size(0), self.hidden_size, self.hidden_size, dtype=torch.float32).to(device)
             self.lstm.rnncell.U = (self.lstm.rnncell.Ucapclone.repeat(x.size(0), 1, 1)).to(device)
             self.lstm.rnncell.v_t = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device) 
+            '''
         if self.lstm.rnncell.complexity == "poor":
             self.lstm.rnncell.X = torch.ones(self.hidden_size, x.size(0), dtype=torch.float32).to(device)
             self.lstm.rnncell.U = (self.lstm.rnncell.Ucapclone.repeat(1, x.size(0))).to(device)
