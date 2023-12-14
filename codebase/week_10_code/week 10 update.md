@@ -135,6 +135,8 @@ Compare this with simple GRU:
         self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Sigmoid(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
 
 ## Problems
+<img width="600" alt="image" src="https://github.com/Yawen502/Computations_in_neural_network/assets/71087503/62ea1261-7184-45b3-90c7-d6cbd2b4bcd2">
+
 #### DaleCB cannot perform better than Vanilla, which is quite counterintuitive
 
 #### The trend of performance of network with respect to input size is not very consistent for different networks
