@@ -24,14 +24,13 @@ We do not consider the combination of Dales' law and non-constant A (literature 
 
 ### Do a comparison graph:
 
-- simple GRU
 - full GRU
+- simple GRU
 - vanilla RNN
-- STP nonDale/Dale (MA)
-- DaleCB MA only
-- CB, CB-GRU refer to overleaf equation (40)
-- STPDaleCB MA
-- SSTP (we're not going to do it)
+- STP nonDaleCB
+- STPDaleCB
+- DaleCB
+- CB-GRU
 
 Think of a good presentation form of the graph, try to make it not too busy.
 Do some summary plots in other forms e.g. bar plot
