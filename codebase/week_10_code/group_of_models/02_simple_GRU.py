@@ -82,7 +82,6 @@ test_data = datasets.MNIST(
 
 
 
-
 'Hyperparameters'
 from torch import nn
 import torch.nn.functional as F
@@ -120,8 +119,9 @@ for i, (images, labels) in enumerate(loaders['train']):
     break
 '''
 
-'Model Definition'
 
+
+'Model Definition'
 class customGRUCell(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers):
         super(customGRUCell, self).__init__()
@@ -133,36 +133,27 @@ class customGRUCell(nn.Module):
         self.b_r = torch.nn.Parameter(torch.rand(self.hidden_size, 1))   
 
         # Update gate z_t
-        # K is always positive            
-        self.g_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))     
-        self.K = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
+        # Wz is defined in the forward function
+        self.w_z = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
         self.p_z = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))
+        self.b_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))         
 
         # Firing rate, Scaling factor and time step initialization
-        self.v_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
-
-        # dt is a constant
-        self.dt = nn.Parameter(torch.tensor(0.1), requires_grad = False)
+        self.r_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
 
         # Nonlinear functions
         self.Sigmoid = nn.Sigmoid()
         self.Tanh = nn.Tanh()
         for name, param in self.named_parameters():
             nn.init.uniform_(param, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
-    @property
-    def r_t(self):
-        return self.Sigmoid(self.v_t)
 
     def forward(self, x):        
-        if self.v_t.dim() == 3:           
-            self.v_t = self.v_t[0]
-        self.v_t = torch.transpose(self.v_t, 0, 1)
-        K = torch.abs(self.K)
-        p_z = torch.abs(self.p_z)
-        self.z_t = torch.zeros(self.hidden_size, 1)
-        self.z_t = self.dt * self.Sigmoid(torch.matmul(K , self.r_t) + torch.matmul(p_z, x) + self.g_z)
-        self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
-        self.v_t = torch.transpose(self.v_t, 0, 1)                
+        if self.r_t.dim() == 3:           
+            self.r_t = self.r_t[0]
+        self.r_t = torch.transpose(self.r_t, 0, 1)
+        self.z_t = self.Sigmoid(torch.matmul(self.w_z, self.r_t) + torch.matmul(self.p_z, x) + self.b_z)
+        self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Sigmoid(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
+        self.r_t = torch.transpose(self.r_t, 0, 1)                
 
 class customGRU(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
@@ -176,7 +167,7 @@ class customGRU(nn.Module):
                 #print(x.shape)
                 x_slice = torch.transpose(x[:,n,:], 0, 1)
                 self.rnncell(x_slice)
-        return self.rnncell.v_t             
+        return self.rnncell.r_t             
             
 class RNN(nn.Module):
     
@@ -190,7 +181,7 @@ class RNN(nn.Module):
 
     def forward(self, x):
         # Set initial hidden and cell states 
-        self.lstm.rnncell.v_t = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device) 
+        self.lstm.rnncell.r_t = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device) 
         #c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         # Passing in the input and hidden state into the model and  obtaining outputs
         out = self.lstm(x)  # out: tensor of shape (batch_size, seq_length, hidden_size)
@@ -313,8 +304,22 @@ with torch.no_grad():
 
 test_acc = 100 * correct / total
 print('Accuracy of the model:{}%'.format(test_acc))
+with open('result.csv', 'a') as f:
+    f.write('01_simple_GRU with input size:{}, test accuracy:{}\n'.format(input_size, test_acc))
+
+
+
+
+"""
+Epoch [10/10], Step [400/500], Training Accuracy: 21.40
+Epoch [10/10], Step [500/500], Training Accuracy: 22.50
+Accuracy of the model:23.43%
+Epoch [10/10], Step [400/500], Training Accuracy: 50.20
+Epoch [10/10], Step [500/500], Training Accuracy: 48.40
+Accuracy of the model:49.29%
+"""
 
 # stride length 4
-# input length 4, Accuracy of the model:
-# input length 8, Accuracy of the model:29.8%
-# input length 12, Accuracy of the model:82.77%
+# input length 4, Accuracy of the model:89.72%
+# input length 8, Accuracy of the model:89.59%
+# input length 12, Accuracy of the model:91.71% 

@@ -265,6 +265,6 @@ with open('result.csv', 'a') as f:
 
 
 # stride length 4
-# input length 4, Accuracy of the model:
-# input length 8, Accuracy of the model:
-# input length 12, Accuracy of the model:
+# input length 4, Accuracy of the model: 9.58%
+# input length 8, Accuracy of the model: 18.13%
+# input length 12, Accuracy of the model: 9.8%

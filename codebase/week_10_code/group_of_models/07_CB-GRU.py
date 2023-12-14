@@ -1,5 +1,6 @@
-
-# Dale's law applied
+# The first model gives the conductance model as we discussed
+# The second model is an simplified one using constant g
+# The third model is the simple GRU model, should be the strongest one
 
 'Data Preprocessing'
 import torch
@@ -81,11 +82,12 @@ test_data = datasets.MNIST(
 
 
 
+
 'Hyperparameters'
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 4
+input_size = 16
 sequence_length = 28*28//input_size
 hidden_size = 24
 num_layers = 1
@@ -118,37 +120,33 @@ for i, (images, labels) in enumerate(loaders['train']):
     break
 '''
 
-
-
 'Model Definition'
+
 class customGRUCell(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers):
         super(customGRUCell, self).__init__()
         self.hidden_size = hidden_size
     
+        # Rest gate r_t 
+        self.w_r = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
         self.p_r = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))           
-        self.b_r = torch.nn.Parameter(torch.full((self.hidden_size, 1), -torch.log(torch.tensor(99.0))), requires_grad=True)
+        self.b_r = torch.nn.Parameter(torch.rand(self.hidden_size, 1))   
 
         # Update gate z_t
-        # Wz is defined in the forward function
-        self.g_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))    
+        # K is always positive            
+        self.g_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))     
         self.K = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
-        self.C = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
-        # v_e and v_i are constant
-        self.v_e = torch.nn.Parameter(torch.tensor(1.0))
-        self.v_i = torch.nn.Parameter(torch.tensor(1.0))
-        self.dt = torch.nn.Parameter(torch.tensor(0.1), requires_grad = False)
+        self.p_z = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))
 
         # Firing rate, Scaling factor and time step initialization
         self.v_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
-        self.excitatory_outputs = torch.zeros(1, self.hidden_size, dtype=torch.float32, requires_grad = False)
+
+        # dt is a constant
+        self.dt = nn.Parameter(torch.tensor(0.1), requires_grad = False)
 
         # Nonlinear functions
         self.Sigmoid = nn.Sigmoid()
         self.Tanh = nn.Tanh()
-        self.relu = nn.ReLU()
-        self.w_scale = 0.192
-        self.b = 10/ self.w_scale
         for name, param in self.named_parameters():
             nn.init.uniform_(param, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
     @property
@@ -158,27 +156,13 @@ class customGRUCell(nn.Module):
     def forward(self, x):        
         if self.v_t.dim() == 3:           
             self.v_t = self.v_t[0]
-
         self.v_t = torch.transpose(self.v_t, 0, 1)
-        # Apply constraints to follow Dale's principle
-        K= torch.exp(self.K)
-        C= torch.exp(self.C)
-        rho = K/(K+C)
-        v_e = torch.exp(self.v_e)
-        v_i = -torch.exp(self.v_i)
-        W_E = v_e * (K[:, :self.hidden_size//2] + C[:, :self.hidden_size//2])
-        W_I = v_i * (K[:, self.hidden_size//2:] + C[:, self.hidden_size//2:])
-        W = torch.cat((W_E, W_I), dim=1)
-        p_z = torch.exp(self.p_r)
+        # No sign constraint on K and w_r
 
-        self.z_t = self.dt * self.Sigmoid(torch.matmul(K, self.r_t)) + torch.matmul(p_z, x) + self.g_z
-        self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(W, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
-        self.v_t = torch.transpose(self.v_t, 0, 1) 
-
-        # zero out inhibitory neurons for output
-        excitatory_mask = W[:, :self.hidden_size//2]
-        excitatory_mask = excitatory_mask.any(dim=1).unsqueeze(0) # Match the shape of r_t
-        self.excitatory_outputs = self.v_t * excitatory_mask
+        self.z_t = torch.zeros(self.hidden_size, 1)
+        self.z_t = self.dt * self.Sigmoid(torch.matmul(self.K , self.r_t) + torch.matmul(self.p_z, x) + self.g_z)
+        self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
+        self.v_t = torch.transpose(self.v_t, 0, 1)                
 
 class customGRU(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
@@ -192,7 +176,7 @@ class customGRU(nn.Module):
                 #print(x.shape)
                 x_slice = torch.transpose(x[:,n,:], 0, 1)
                 self.rnncell(x_slice)
-        return self.rnncell.excitatory_outputs            
+        return self.rnncell.v_t             
             
 class RNN(nn.Module):
     
@@ -290,7 +274,7 @@ def train(num_epochs, model, loaders, patience=2, min_delta=0.01):
             loss.backward()
             model_optimizer.step()
             
-            if (i+1) % 625 == 0:
+            if (i+1) % 750 == 0:
                 accuracy = evaluate_while_training(model, loaders)
                 train_acc.append(accuracy)
                 print('Epoch [{}/{}], Step [{}/{}], Training Accuracy: {:.2f}' 
@@ -329,13 +313,8 @@ with torch.no_grad():
 
 test_acc = 100 * correct / total
 print('Accuracy of the model:{}%'.format(test_acc))
-with open('result.csv', 'a') as f:
-    f.write('06 with input size:{}, test accuracy:{}\n'.format(input_size, test_acc))
-
-
-
 
 # stride length 4
-# input length 4, Accuracy of the model:
-# input length 8, Accuracy of the model:
-# input length 12, Accuracy of the model:nwkpmfrna,anams:nam.ze
+# input length 4, Accuracy of the model:85.0%
+# input length 8, Accuracy of the model: 79.69%
+# input length 12, Accuracy of the model:80.45%

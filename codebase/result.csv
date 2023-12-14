@@ -2,3 +2,4 @@
 01_simple_GRU with input size:12, test accuracy:43.77
 01_simple_GRU with input size:8, test accuracy:11.35
 01_simple_GRU with input size:8, test accuracy:89.59
+01_simple_GRU with input size:16, test accuracy:91.71

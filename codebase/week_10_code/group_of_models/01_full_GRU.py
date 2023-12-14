@@ -122,76 +122,25 @@ for i, (images, labels) in enumerate(loaders['train']):
 
 
 'Model Definition'
-class customGRUCell(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers):
-        super(customGRUCell, self).__init__()
-        self.hidden_size = hidden_size
-    
-        # Rest gate r_t 
-        self.w_r = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
-        self.p_r = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))           
-        self.b_r = torch.nn.Parameter(torch.rand(self.hidden_size, 1))   
-
-        # Update gate z_t
-        # Wz is defined in the forward function
-        self.w_z = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
-        self.p_z = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))
-        self.b_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))         
-
-        # Firing rate, Scaling factor and time step initialization
-        self.r_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
-
-        # Nonlinear functions
-        self.Sigmoid = nn.Sigmoid()
-        self.Tanh = nn.Tanh()
-        for name, param in self.named_parameters():
-            nn.init.uniform_(param, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
-
-    def forward(self, x):        
-        if self.r_t.dim() == 3:           
-            self.r_t = self.r_t[0]
-        self.r_t = torch.transpose(self.r_t, 0, 1)
-        self.z_t = self.Sigmoid(torch.matmul(self.w_z, self.r_t) + torch.matmul(self.p_z, x) + self.b_z)
-        self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Sigmoid(torch.matmul(self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
-        self.r_t = torch.transpose(self.r_t, 0, 1)                
-
-class customGRU(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
-        super(customGRU, self).__init__()
-        self.rnncell = customGRUCell(input_size, hidden_size, num_layers).to(device)
-        self.batch_first = batch_first
-
-    def forward(self, x):
-        if self.batch_first == True:
-            for n in range(x.size(1)):
-                #print(x.shape)
-                x_slice = torch.transpose(x[:,n,:], 0, 1)
-                self.rnncell(x_slice)
-        return self.rnncell.r_t             
-            
-class RNN(nn.Module):
-    
+class GRU(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_classes):
-        super(RNN, self).__init__()
+        super(GRU, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.lstm = customGRU(input_size, hidden_size, num_layers)
-        self.fc = nn.Linear(hidden_size, 10)
-        pass
+        self.gru = nn.GRU(input_size, hidden_size, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_size, num_classes)
 
     def forward(self, x):
-        # Set initial hidden and cell states 
-        self.lstm.rnncell.r_t = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device) 
-        #c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
-        # Passing in the input and hidden state into the model and  obtaining outputs
-        out = self.lstm(x)  # out: tensor of shape (batch_size, seq_length, hidden_size)
-        #Reshaping the outputs such that it can be fit into the fully connected layer
-        out = self.fc(out)
-        return out.squeeze(-1)
-        
-        pass                                    
-pass
-model = RNN(input_size, hidden_size, num_layers, num_classes).to(device)
+        # Set initial hidden states (and cell states for LSTM)
+        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device) 
+
+        # Forward propagate GRU
+        out, _ = self.gru(x, h0)  # out: tensor of shape (batch_size, seq_length, hidden_size)
+
+        # Decode the hidden state of the last time step
+        out = self.fc(out[:, -1, :])
+        return out
+model = GRU(input_size, hidden_size, num_layers, num_classes).to(device)
 print(model)
 loss_func = nn.CrossEntropyLoss()
 
@@ -310,16 +259,7 @@ with open('result.csv', 'a') as f:
 
 
 
-"""
-Epoch [10/10], Step [400/500], Training Accuracy: 21.40
-Epoch [10/10], Step [500/500], Training Accuracy: 22.50
-Accuracy of the model:23.43%
-Epoch [10/10], Step [400/500], Training Accuracy: 50.20
-Epoch [10/10], Step [500/500], Training Accuracy: 48.40
-Accuracy of the model:49.29%
-"""
-
 # stride length 4
-# input length 4, Accuracy of the model:
-# input length 8, Accuracy of the model:89.59%
-# input length 12, Accuracy of the model:
+# input length 4, Accuracy of the model: 88.74%
+# input length 8, Accuracy of the model: 87.28%
+# input length 12, Accuracy of the model: 92.32%
