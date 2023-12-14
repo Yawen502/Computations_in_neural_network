@@ -86,7 +86,7 @@ test_data = datasets.MNIST(
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 8
+input_size = 16
 sequence_length = 28*28//input_size
 hidden_size = 24
 num_layers = 1

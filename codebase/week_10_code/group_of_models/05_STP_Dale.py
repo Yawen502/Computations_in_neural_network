@@ -231,7 +231,7 @@ class customGRUCell(nn.Module):
 class customGRU(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
         super(customGRU, self).__init__()
-        self.rnncell = customGRUCell(input_size, hidden_size, num_layers).to(device)
+        self.rnncell = customGRUCell(input_size, hidden_size, "poor", num_layers)
         self.batch_first = batch_first
 
     def forward(self, x):
@@ -266,7 +266,7 @@ class RNN(nn.Module):
         
         pass                                    
 pass
-model = RNN(input_size, hidden_size, num_layers, num_classes).to(device)
+model = RNN(input_size, hidden_size, "poor", num_layers, num_classes).to(device)
 print(model)
 loss_func = nn.CrossEntropyLoss()
 
@@ -387,5 +387,5 @@ with open('result.csv', 'a') as f:
 
 # stride length 4
 # input length 4, Accuracy of the model:
-# input length 8, Accuracy of the model:
+# input length 8, Accuracy of the model:16.35%
 # input length 12, Accuracy of the model:

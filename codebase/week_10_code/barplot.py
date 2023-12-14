@@ -21,11 +21,11 @@ performance[1,:] = [89.72, 89.59, 91.71]
 # CB-GRU
 performance[2,:] = [85.0, 79.69, 80.45]
 # STPCB
-#performance[3,:] = [
+performance[3,:] = [ , 73.78, 51.69]
 # DaleCB
-#performance[4,:] = [
+#performance[4,:] = [ p, 16.35, v]
 # STPDaleCB
-#performance[5,:] = [
+performance[5,:] = [46.5,,]
 # Vanilla RNN
 performance[6,:] = [9.58, 18.13, 9.8]
 # Set the width of each bar
