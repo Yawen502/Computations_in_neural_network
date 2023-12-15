@@ -138,6 +138,9 @@ Compare this with simple GRU:
 <img width="600" alt="image" src="https://github.com/Yawen502/Computations_in_neural_network/assets/71087503/62ea1261-7184-45b3-90c7-d6cbd2b4bcd2">
 
 #### DaleCB cannot perform better than Vanilla, which is quite counterintuitive
+- The results agree with the paper I read yesterday on Dale's learning, that implementing Dale's law hurt the performance.
+- The number of hidden size is not the prime factor, doubling or even tripling hidden size do not help to increase the performance.
+- Another reason might be the way I construct the weight matrix prevents the algorithm to learn in matrix space, inspired by the paper. Changing the way of constructing the matrix may work.
 
 #### The trend of performance of network with respect to input size is not very consistent for different networks
 
@@ -149,4 +152,6 @@ Compare this with simple GRU:
 
 - Check what is wrong with DaleCB. Although we have the Dale constraints, with the current and conductance-based feature we should still have at least 25-35% like performance from expectation. Also we're using small hidden size, so that might be an issue -- I'm using same hidden size for Dale and nonDale model, which might not be fair.
 
-- STP nonDale and STPDale both perform well, and as Dale is introducing constraints it is not strange that the nonDale model outperforms. STPDale's model proves that with a large degree of biological features, the model perform well. 
+- STP nonDale and STPDale both perform well, and as Dale is introducing constraints it is not strange that the nonDale model outperforms. STPDale's model proves that with a large degree of biological features, the model perform well.
+
+
