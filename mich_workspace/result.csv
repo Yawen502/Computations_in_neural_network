@@ -1,0 +1,17 @@
+01_simple_GRU with input size:12, test accuracy:10.0
+01_simple_GRU with input size:12, test accuracy:43.77
+01_simple_GRU with input size:8, test accuracy:11.35
+01_simple_GRU with input size:8, test accuracy:89.59
+01_simple_GRU with input size:16, test accuracy:91.71
+01_simple_GRU with input size:16, test accuracy:51.69
+06 with input size:4, test accuracy:46.5
+06 with input size:8, test accuracy:16.35
+06 with input size:16, test accuracy:68.22
+06 with input size:8, test accuracy:20.88
+06 with input size:8, test accuracy:9.8
+06 with input size:4, test accuracy:14.11
+06 with input size:8, test accuracy:28.58
+06 with input size:16, test accuracy:9.8
+06 with input size:16, test accuracy:9.8
+06 with input size:8, test accuracy:9.8
+06 with input size:8, test accuracy:9.8

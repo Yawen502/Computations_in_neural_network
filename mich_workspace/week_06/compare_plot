@@ -1,0 +1,31 @@
+import matplotlib.pyplot as plt
+
+# Example data
+hyperparameters = ['input size 12', 'input size 24', 'input size 48']
+
+# Accuracies for each model
+accuracies_model1 = [35.34, 49.29, 47.89]  # Simple GRU
+accuracies_model2 = [25.16, 33.92, 35.00]  # Matrix A bRNN
+accuracies_model3 = [41.61, 43.66, 38.96]  # Constant A bRNN
+accuracies_model4 = [11.97, 13.26, 18.95]  # Vanilla RNN
+
+
+# Plotting
+plt.figure(figsize=(10, 6))
+
+# Plot for each model in one figure
+plt.plot(hyperparameters, accuracies_model1, '-o', color='red', label='Simple-GRU')
+plt.plot(hyperparameters, accuracies_model2, '-o', color='blue', label='Matrix-A bRNN')
+plt.plot(hyperparameters, accuracies_model3, '-o', color='green', label='Constant-A bRNN')
+plt.plot(hyperparameters, accuracies_model4, '-o', color='orange', label='Vanilla RNN')
+# label 10 accuracy as 'by chance'
+plt.plot(hyperparameters, [10]*3, '--', color='black', label='By chance')
+
+plt.ylabel('Final Accuracy')
+plt.title('Comparison of Models')
+plt.grid(True)
+plt.legend()
+
+# Show the plot
+plt.show()
+
