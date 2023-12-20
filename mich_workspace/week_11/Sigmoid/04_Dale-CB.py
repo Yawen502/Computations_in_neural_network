@@ -189,7 +189,6 @@ class Dale_CBcell(nn.Module):
         W_E = self.relu(W_E)
         W_I = -self.relu(-W_I)
         W = torch.cat((W_E, W_I), 1)
-        # use softmax to constrain P_z
 
         ### Update Equations ###
         self.z_t = torch.zeros(self.hidden_size, 1)

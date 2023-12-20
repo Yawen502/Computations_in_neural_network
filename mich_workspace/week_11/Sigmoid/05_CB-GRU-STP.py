@@ -364,6 +364,6 @@ test_acc = 100 * correct / total
 print('Accuracy of the model:{}%'.format(test_acc))
 
 # stride length 4
-# input length 4, Accuracy of the model:85.0%
-# input length 8, Accuracy of the model:79.69%
-# input length 12, Accuracy of the model:80.45%
+# input length 4, Accuracy of the model:
+# input length 8, Accuracy of the model:
+# input length 16, Accuracy of the model:
