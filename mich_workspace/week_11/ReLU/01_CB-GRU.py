@@ -82,11 +82,12 @@ test_data = datasets.MNIST(
 
 
 
+
 'Hyperparameters'
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 4
+input_size = 16
 sequence_length = 28*28//input_size
 hidden_size = 24
 num_layers = 1
@@ -95,7 +96,6 @@ batch_size = 40
 num_epochs = 10
 learning_rate = 0.01
 stride_number = 4
-print('input size:', input_size)
 
 from torch.utils.data import DataLoader
 loaders = {
@@ -120,159 +120,67 @@ for i, (images, labels) in enumerate(loaders['train']):
     break
 '''
 
-
-
 'Model Definition'
-class customGRUCell(nn.Module):
-    def __init__(self, input_size, hidden_size, complexity, num_layers):
-        super(customGRUCell, self).__init__()
-        self.input_size = input_size
+
+class CB_GRUcell(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers):
+        super(CB_GRUcell, self).__init__()
         self.hidden_size = hidden_size
-        self.complexity = complexity
-        self.ones = torch.ones(self.hidden_size, self.hidden_size)
-        self.batch_size = batch_size 
-        self.forprintingX = []
-        self.forprintingU = []
-        self.forprintingh = []
-        # Nonlinear functions
-        self.Sigmoid = nn.Sigmoid()
-        self.Tanh = nn.Tanh()
-        self.relu = nn.ReLU()
-
-
-        # STP model initialisations
-        '''
-        if self.complexity == "rich":
-            # Short term Plasticity variables 
-            self.delta_t = 1
-            self.z_min = 0.001
-            self.z_max = 0.1
-
-            # Short term Depression parameters  
-            self.c_x = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
-
-            # Short term Facilitation parameters
-            self.c_u = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
-            self.c_U = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
-            
-            # State initialisations
-            self.X = torch.ones(self.hidden_size, self.hidden_size, dtype=torch.float32)     
-            self.U = torch.full((self.hidden_size, self.hidden_size), 0.9, dtype=torch.float32)         
-            self.Ucap = 0.9 * self.Sigmoid(self.c_U)
-            self.Ucapclone = self.Ucap.clone().detach()
-'''
-        if self.complexity == "poor":
-            # Short term Plasticity variables 
-            self.delta_t = 1
-            self.z_min = 0.001
-            self.z_max = 0.1
-
-            # Short term Depression parameters  
-            self.c_x = torch.nn.Parameter(torch.rand(self.hidden_size, 1))
-
-            # Short term Facilitation parameters
-            self.c_u = torch.nn.Parameter(torch.rand(self.hidden_size, 1))
-            self.c_U = torch.nn.Parameter(torch.rand(self.hidden_size, 1))
-            
-            # State initialisations
-            self.X = torch.ones(self.hidden_size, 1, dtype=torch.float32)
-            self.U = torch.full((self.hidden_size, 1), 0.9, dtype=torch.float32)   
-            self.Ucap = 0.9 * self.Sigmoid(self.c_U)
-            self.Ucapclone = self.Ucap.clone().detach()
-            
-        self.w_r = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
-        self.p_r = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))           
-        self.b_r = torch.nn.Parameter(torch.full((self.hidden_size, 1), -torch.log(torch.tensor(99.0))), requires_grad=True)
-
-        # Initialize b_r to be -log(99), so at steady state f.r. close to biological firing rate of 1Hz
+    
+        # voltage gate v_t 
+        self.W = torch.nn.Parameter(torch.empty(self.hidden_size, self.hidden_size))
+        self.P = torch.nn.Parameter(torch.empty(self.hidden_size, input_size))           
+        self.b_v = torch.nn.Parameter(torch.zeros(self.hidden_size, 1))   
 
         # Update gate z_t
-        # K is always positive            
-        self.g_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))     
-        self.K = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))   
-        self.p_z = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))
+        # K and W are unbounded free parameters          
+        self.K = torch.nn.Parameter(torch.empty(self.hidden_size, self.hidden_size))
+        self.P_z = torch.nn.Parameter(torch.empty(self.hidden_size, input_size))
+        #init b_z to be log 1/99
+        self.b_z = torch.nn.Parameter(torch.empty(self.hidden_size, 1))   
 
         # Firing rate, Scaling factor and time step initialization
         self.v_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
-        # a and dt are fixed
+
+        # dt is a constant
+        self.dt = nn.Parameter(torch.tensor(0.1), requires_grad = False)
+
+        # Nonlinear functions
+        self.sigmoid = nn.Sigmoid()
+        self.softplus = nn.Softplus()
+        self.relu = nn.ReLU()
+
+        # Define initialisation
+        glorot_init = lambda w: nn.init.uniform_(w, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
+        #positive_glorot_init = lambda w: nn.init.uniform_(w, a=0, b=(1/math.sqrt(hidden_size)))
+
+        # initialise matrices
+        for w in self.W, self.P, self.K,self.P_z:
+            glorot_init(w)
+        #init b_z to be log 1/99
+        nn.init.constant_(self.b_z, torch.log(torch.tensor(1/99)))
+
         
-        self.dt = torch.nn.Parameter(torch.tensor(0.1), requires_grad = False)
-        # dt is clamped between 0 and 1 to ensure it makes sense biologically
 
-        self.w_scale = 0.192
-        self.b = 10/ self.w_scale
-
-        self.zt_history = []
-        self.ht_history = []
-        for name, param in self.named_parameters():
-            print(name, param.shape)
-            nn.init.uniform_(param, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
     @property
     def r_t(self):
-        return self.Sigmoid(self.v_t)
+        return self.relu(self.v_t)
 
     def forward(self, x):        
         if self.v_t.dim() == 3:           
             self.v_t = self.v_t[0]
-
         self.v_t = torch.transpose(self.v_t, 0, 1)
-        # Apply constraints to follow Dale's principle
-        # w_r and k are indepedent and always positive
-        # determine A based on the sign of w_r 
-        K = torch.exp(self.K)
-        p_z = torch.exp(self.p_z)
-        # STP model updates
-        '''
-        if self.complexity == "rich":
-            # Short term Depression 
-            self.z_x = self.z_min + (self.z_max - self.z_min) * self.Sigmoid(self.c_x)
-            self.X = self.z_x + torch.mul((1 - self.z_x), self.X) - self.delta_t * self.U * torch.einsum("ijk, ji  -> ijk", self.X, self.r_t)
+        # No sign constraint on K and W
 
-            # Short term Facilitation 
-            self.z_u = self.z_min + (self.z_max - self.z_min) * self.Sigmoid(self.c_u)    
-            self.Ucap = 0.9 * self.Sigmoid(self.c_U)
-            self.U = self.Ucap * self.z_u + torch.mul((1 - self.z_u), self.U) + self.delta_t * self.Ucap * torch.einsum("ijk, ji  -> ijk", (1 - self.U), self.r_t)
-            self.Ucapclone = self.Ucap.clone().detach() 
-            self.U = torch.clamp(self.U, min=self.Ucapclone.repeat(self.U.size(0), 1, 1).to(device), max=torch.ones_like(self.Ucapclone.repeat(self.U.size(0), 1, 1).to(device)))
-            
+        self.z_t = torch.zeros(self.hidden_size, 1)
+        self.z_t = self.dt * self.sigmoid(torch.matmul(self.K , self.r_t) + torch.matmul(self.P_z, x) + self.b_z)
+        self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.W, self.r_t) + torch.matmul(self.P, x) + self.b_v)
+        self.v_t = torch.transpose(self.v_t, 0, 1)                
 
-            # Update gate z_t
-            self.z_t = self.dt * self.Sigmoid(torch.matmul(K, self.r_t) + torch.matmul(p_z, x) + self.g_z)
-            # Voltage update after both conductance and STP updates
-            self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.X*self.U*self.w_r, self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
-            self.v_t = self.v_t[0]
-            self.v_t = torch.transpose(self.v_t, 0, 1) 
-
-            '''
-        if self.complexity == "poor":
-            x = torch.transpose(x, 0, 1)
-            sigmoid = nn.Sigmoid()
-            
-            # Short term Depression 
-            self.z_x = self.z_min + (self.z_max - self.z_min) * sigmoid(self.c_x)
-            self.X = self.z_x + torch.mul((1 - self.z_x), self.X) - self.delta_t * self.U * self.X * self.r_t
-
-            # Short term Facilitation 
-            self.z_u = self.z_min + (self.z_max - self.z_min) * sigmoid(self.c_u)    
-            self.Ucap = 0.9 * sigmoid(self.c_U)
-            self.U = self.Ucap * self.z_u + torch.mul((1 - self.z_u), self.U) + self.delta_t * self.Ucap * (1 - self.U) * self.r_t
-            self.Ucapclone = self.Ucap.clone().detach()
-            self.U = torch.clamp(self.U, min=self.Ucapclone.repeat(1, x.size(0)).to(device), max=torch.ones_like(self.Ucapclone.repeat(1, x.size(0)).to(device)))
-            x = torch.transpose(x, 0, 1)
-            # Update gate z_t
-            self.z_t = self.dt * sigmoid(torch.matmul(K, self.r_t) + torch.matmul(p_z, x) + self.g_z)
-            # Voltage update after both conductance and STP updates
-            self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.w_r, self.U*self.X*self.r_t) + torch.matmul(self.p_r, x) + self.b_r)
-            self.v_t = torch.transpose(self.v_t, 0, 1) 
-
-
-                
-
-
-class customGRU(nn.Module):
-    def __init__(self, input_size, hidden_size, complexity, num_layers, batch_first=True):
-        super(customGRU, self).__init__()
-        self.rnncell = customGRUCell(input_size, hidden_size, complexity, num_layers).to(device)
+class CB_GRU_batch(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
+        super(CB_GRU_batch, self).__init__()
+        self.rnncell = CB_GRUcell(input_size, hidden_size, num_layers).to(device)
         self.batch_first = batch_first
 
     def forward(self, x):
@@ -283,29 +191,21 @@ class customGRU(nn.Module):
                 self.rnncell(x_slice)
         return self.rnncell.v_t             
             
-class RNN(nn.Module):
+class CB_GRU(nn.Module):
     
-    def __init__(self, input_size, hidden_size, complexity, num_layers, num_classes):
-        super(RNN, self).__init__()
+    def __init__(self, input_size, hidden_size, num_layers, num_classes):
+        super(CB_GRU, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.lstm = customGRU(input_size, hidden_size, complexity, num_layers)
+        self.lstm = CB_GRU_batch(input_size, hidden_size, num_layers)
         self.fc = nn.Linear(hidden_size, 10)
         pass
 
     def forward(self, x):
-        # Set initial hidden and cell states
-        ''' 
-        if self.lstm.rnncell.complexity == "rich":
-            self.lstm.rnncell.X = torch.ones(x.size(0), self.hidden_size, self.hidden_size, dtype=torch.float32).to(device)
-            self.lstm.rnncell.U = (self.lstm.rnncell.Ucapclone.repeat(x.size(0), 1, 1)).to(device)
-            self.lstm.rnncell.v_t = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device) 
-            '''
-        if self.lstm.rnncell.complexity == "poor":
-            self.lstm.rnncell.X = torch.ones(self.hidden_size, x.size(0), dtype=torch.float32).to(device)
-            self.lstm.rnncell.U = (self.lstm.rnncell.Ucapclone.repeat(1, x.size(0))).to(device)
-            self.lstm.rnncell.v_t = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device) 
-            # Passing in the input and hidden state into the model and  obtaining outputs
+        # Set initial hidden and cell states 
+        self.lstm.rnncell.v_t = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device) 
+        #c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
+        # Passing in the input and hidden state into the model and  obtaining outputs
         out = self.lstm(x)  # out: tensor of shape (batch_size, seq_length, hidden_size)
         #Reshaping the outputs such that it can be fit into the fully connected layer
         out = self.fc(out)
@@ -313,7 +213,8 @@ class RNN(nn.Module):
         
         pass                                    
 pass
-model = RNN(input_size, hidden_size, 'poor', num_layers, num_classes).to(device)
+
+model = CB_GRU(input_size, hidden_size, num_layers, num_classes).to(device)
 print(model)
 loss_func = nn.CrossEntropyLoss()
 
@@ -426,24 +327,8 @@ with torch.no_grad():
 
 test_acc = 100 * correct / total
 print('Accuracy of the model:{}%'.format(test_acc))
-with open('result.csv', 'a') as f:
-    f.write('01_simple_GRU with input size:{}, test accuracy:{}\n'.format(input_size, test_acc))
-
-
-
-
-"""
-Epoch [10/10], Step [400/500], Training Accuracy: 21.40
-Epoch [10/10], Step [500/500], Training Accuracy: 22.50
-Accuracy of the model:23.43%
-Epoch [10/10], Step [400/500], Training Accuracy: 50.20
-Epoch [10/10], Step [500/500], Training Accuracy: 48.40
-Accuracy of the model:49.29%
-"""
 
 # stride length 4
-# input length 4, Accuracy of the model:89.72%
-# input length 8, Accuracy of the model:89.59%
-# input length 12, Accuracy of the model:91.71% 
-
-# Check if W and K and C are as we expect
+# input length 4, Accuracy of the model:85.0%
+# input length 8, Accuracy of the model:79.69%
+# input length 12, Accuracy of the model:80.45%
