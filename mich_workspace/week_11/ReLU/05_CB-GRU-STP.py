@@ -181,7 +181,7 @@ class CB_GRU_STPcell(nn.Module):
 
     @property
     def r_t(self):
-        return self.relu(self.v_t)
+        return self.sigmoid(self.v_t)
 
     def forward(self, x):        
         if self.v_t.dim() == 3:           
