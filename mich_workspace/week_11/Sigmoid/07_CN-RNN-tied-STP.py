@@ -213,7 +213,7 @@ class CB_RNN_tiedcell(nn.Module):
 
         ### Update Equations ###
         self.z_t = self.dt * self.sigmoid(torch.matmul(K , self.r_t) + torch.matmul(P_z, x) + self.b_z)
-        self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.W, self.r_t) + torch.matmul(self.P, x) + self.b_v)
+        self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.W, self.U*self.X*self.r_t) + torch.matmul(self.P, x) + self.b_v)
         self.v_t = torch.transpose(self.v_t, 0, 1)                
 
 class CB_RNN_tied_batch(nn.Module):

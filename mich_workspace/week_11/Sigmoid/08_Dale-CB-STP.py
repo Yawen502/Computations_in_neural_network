@@ -93,7 +93,7 @@ hidden_size = 24
 num_layers = 1
 num_classes = 10
 batch_size = 40
-num_epochs = 1
+num_epochs = 10
 learning_rate = 0.01
 stride_number = 4
 
