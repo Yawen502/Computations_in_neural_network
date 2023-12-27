@@ -2,7 +2,9 @@
 import torch
 
 # Specify the path to your .pth file
-pth_file = "sigmoid_CB-RNN-tied-weights.pth"
+#pth_file = "Dale-CB-weights.pth"
+#pth_file = 'sigmoid_CB-RNN-tied-weights.pth'
+pth_file = 'relu_CB-RNN-tied-weights.pth'
 
 # Load the model or tensor from the .pth file
 data = torch.load(pth_file)

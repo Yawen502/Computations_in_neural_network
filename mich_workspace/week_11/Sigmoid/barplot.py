@@ -11,7 +11,7 @@ import numpy as np
 - vanilla RNN
 '''
 # Define the models and their performance for each input situation
-models = ['CB-GRU', 'CB-RNN', 'CB-RNN-tied', 'Dale-CB', 'CB-GRU-STP', 'CB-RNN-STP', 'CB-RNN-tied-STP']
+models = ['CB-GRU', 'CB-RNN', 'CB-RNN-tied', 'Dale-CB', 'CB-GRU-STP', 'CB-RNN-STP', 'CB-RNN-tied-STP', 'Dale-CB-STP']
 input_situations = ['Sigmoid', 'ReLU']
 performance = np.random.rand(len(models), len(input_situations))
 
@@ -24,11 +24,13 @@ performance[2,:] = [80.91, 79.84]
 # 04 Dale-CB
 performance[3,:] = [81.93, 77.26]
 # 05 CB-GRU-STP
-performance[4,:] = [80.93,9 ]
+performance[4,:] = [80.93, 9.80 ]
 # 06 CB-RNN-STP
-performance[5,:] = [81.37,9 ]
+performance[5,:] = [81.37, 9.80 ]
 # 07 CB-RNN-tied-STP
-performance[6,:] = [77.01,9 ]
+performance[6,:] = [77.01, 9.80 ]
+# 08 Dale-CB-STP
+performance[7,:] = [75.08, 9.80 ]
 # Set the width of each bar
 bar_width = 0.2
 
@@ -38,7 +40,7 @@ x = np.arange(len(models))
 # Create the bar plot
 fig, ax = plt.subplots()
 for i, situation in enumerate(input_situations):
-    ax.bar(x + i * bar_width, performance[:, i], bar_width, label=f'Input = {situation}')
+    ax.bar(x + i * bar_width, performance[:, i], bar_width, label=f'{situation}')
 
 
 # Add labels, title, and legend
