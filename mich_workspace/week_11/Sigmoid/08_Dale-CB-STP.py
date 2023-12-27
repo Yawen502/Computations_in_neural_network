@@ -93,7 +93,7 @@ hidden_size = 24
 num_layers = 1
 num_classes = 10
 batch_size = 40
-num_epochs = 10
+num_epochs = 1
 learning_rate = 0.01
 stride_number = 4
 
@@ -122,25 +122,28 @@ for i, (images, labels) in enumerate(loaders['train']):
 
 'Model Definition'
 
-class CB_RNN_tiedcell(nn.Module):
+class Dale_CB_STPcell(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers):
-        super(CB_RNN_tiedcell, self).__init__()
+        super(Dale_CB_STPcell, self).__init__()
         self.hidden_size = hidden_size
     
         ### Parameters ###
         # voltage gate v_t 
-        self.W = torch.nn.Parameter(torch.empty(self.hidden_size, self.hidden_size))
         self.P = torch.nn.Parameter(torch.empty(self.hidden_size, input_size))           
         self.b_v = torch.nn.Parameter(torch.zeros(self.hidden_size, 1))   
 
         # Update gate z_t
-        # K and P_z become tied          
+        # K and W are unbounded free parameters   
+        # C represents  current based portion of connectivity       
+        self.K = torch.nn.Parameter(self.init_dale(self.hidden_size, self.hidden_size))
+        self.C = torch.nn.Parameter(self.init_dale(self.hidden_size, self.hidden_size))
+        self.P_z = torch.nn.Parameter(torch.empty(self.hidden_size, input_size))
         self.b_z = torch.nn.Parameter(torch.empty(self.hidden_size, 1))   
-        # initialise e as a random float between 0 and 1
-        self.e = torch.nn.Parameter(torch.rand(1))
-        self.e_p = torch.nn.Parameter(torch.rand(1))
+        # Potentials are initialised with right signs
+        self.e_e = torch.nn.Parameter(torch.rand(1))
+        self.e_i = torch.nn.Parameter(-torch.rand(1))
 
-        # Voltage rate
+        # Firing rate, Scaling factor and time step initialization
         self.v_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
 
         # dt is a constant
@@ -156,8 +159,11 @@ class CB_RNN_tiedcell(nn.Module):
         positive_glorot_init = lambda w: nn.init.uniform_(w, a=0, b=(1/math.sqrt(hidden_size)))
 
         # initialise matrices
-        for w in self.W, self.P:
+        # P and P_z are unconstrained
+        for w in self.P_z, self.P:
             glorot_init(w)
+        for w in self.K, self.C:
+            positive_glorot_init(w)
         # init b_z to be log 1/99
         nn.init.constant_(self.b_z, torch.log(torch.tensor(1/99)))
 
@@ -179,6 +185,18 @@ class CB_RNN_tiedcell(nn.Module):
         self.Ucap = 0.9 * self.sigmoid(self.c_U)
         self.Ucapclone = self.Ucap.clone().detach() 
 
+    def init_dale(self, rows, cols):
+        # Dale's law with equal excitatory and inhibitory neurons
+        exci = torch.empty((rows, cols//2)).exponential_(1.0)
+        inhi = -torch.empty((rows, cols//2)).exponential_(1.0)
+        weights = torch.cat((exci, inhi), dim=1)
+        weights = self.adjust_spectral(weights)
+        return weights
+
+    def adjust_spectral(self, weights, desired_radius=1.5):
+        values, _ = torch.linalg.eig(weights @ weights.T)
+        radius = values.abs().max()
+        return weights * (desired_radius / radius)
         
 
     @property
@@ -191,10 +209,17 @@ class CB_RNN_tiedcell(nn.Module):
         self.v_t = torch.transpose(self.v_t, 0, 1)
 
         ### Constraints###
-        e = self.softplus(self.e)
-        e_p = self.softplus(self.e_p)
-        K = e * self.softplus(self.W)
-        P_z = e_p * self.softplus(self.P)
+        K = self.softplus(self.K)
+        C = self.softplus(self.C)
+        # W is constructed using e*(K+C)
+        W_E = self.e_e * (K[:, :self.hidden_size//2] + C[:, :self.hidden_size//2])
+        W_I = self.e_i * (K[:, self.hidden_size//2:] + C[:, self.hidden_size//2:])
+        # print to see which device the tensor is on
+        # If sign of W do not obey Dale's law, then these terms to be 0
+        W_E = self.relu(W_E)
+        W_I = -self.relu(-W_I)
+        W = torch.cat((W_E, W_I), 1)
+        self.W = W
 
         ### STP model ###
         x = torch.transpose(x, 0, 1)
@@ -211,15 +236,19 @@ class CB_RNN_tiedcell(nn.Module):
         self.U = torch.clamp(self.U, min=self.Ucapclone.repeat(1, x.size(0)).to(device), max=torch.ones_like(self.Ucapclone.repeat(1, x.size(0)).to(device)))
         x = torch.transpose(x, 0, 1)
 
-        ### Update Equations ###
-        self.z_t = self.dt * self.sigmoid(torch.matmul(K , self.r_t) + torch.matmul(P_z, x) + self.b_z)
-        self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.W, self.r_t) + torch.matmul(self.P, x) + self.b_v)
-        self.v_t = torch.transpose(self.v_t, 0, 1)                
 
-class CB_RNN_tied_batch(nn.Module):
+        ### Update Equations ###
+        self.z_t = torch.zeros(self.hidden_size, 1)
+        self.z_t = self.dt * self.sigmoid(torch.matmul(K , self.r_t) + torch.matmul(self.P_z, x) + self.b_z)
+        self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(W, self.U*self.X*self.r_t) + torch.matmul(self.P, x) + self.b_v)
+        self.v_t = torch.transpose(self.v_t, 0, 1)      
+        excitatory = self.v_t[:, :self.hidden_size//2]
+        self.excitatory = torch.cat((excitatory, torch.zeros_like(excitatory)), 1)    
+
+class Dale_CB_STP_batch(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
-        super(CB_RNN_tied_batch, self).__init__()
-        self.rnncell = CB_RNN_tiedcell(input_size, hidden_size, num_layers).to(device)
+        super(Dale_CB_STP_batch, self).__init__()
+        self.rnncell = Dale_CB_STPcell(input_size, hidden_size, num_layers).to(device)
         self.batch_first = batch_first
 
     def forward(self, x):
@@ -228,15 +257,15 @@ class CB_RNN_tied_batch(nn.Module):
                 #print(x.shape)
                 x_slice = torch.transpose(x[:,n,:], 0, 1)
                 self.rnncell(x_slice)
-        return self.rnncell.v_t             
+        return self.rnncell.excitatory            
             
-class CB_RNN_tied(nn.Module):
+class Dale_CB_STP(nn.Module):
     
     def __init__(self, input_size, hidden_size, num_layers, num_classes):
-        super(CB_RNN_tied, self).__init__()
+        super(Dale_CB_STP, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.lstm = CB_RNN_tied_batch(input_size, hidden_size, num_layers)
+        self.lstm = Dale_CB_STP_batch(input_size, hidden_size, num_layers)
         self.fc = nn.Linear(hidden_size, 10)
         pass
 
@@ -254,7 +283,7 @@ class CB_RNN_tied(nn.Module):
         pass                                    
 pass
 
-model = CB_RNN_tied(input_size, hidden_size, num_layers, num_classes).to(device)
+model = Dale_CB_STP(input_size, hidden_size, num_layers, num_classes).to(device)
 print(model)
 loss_func = nn.CrossEntropyLoss()
 
@@ -369,37 +398,17 @@ test_acc = 100 * correct / total
 print('Accuracy of the model:{}%'.format(test_acc))
 
 # stride length 4
-# input length 4, Accuracy of the model:85.0%
-# input length 8, Accuracy of the model:79.69%
-# input length 12, Accuracy of the model:80.45%
+# input length 4, Accuracy of the model:
+# input length 8, Accuracy of the model:
+# input length 16, Accuracy of the model:
 
 # Retrieve weights
 P = model.lstm.rnncell.P.detach().cpu().numpy()
 W = model.lstm.rnncell.W.detach().cpu().numpy()
 read_out = model.fc.weight.detach().cpu().numpy()
 
-
-# Retrieve Ucap, z_u, z_x
-Ucap = model.lstm.rnncell.Ucap
-z_u = model.lstm.rnncell.z_u
-z_x = model.lstm.rnncell.z_x
-
-# Assuming W, Ucap, z_x, and z_u are PyTorch tensors
-abs_W = torch.abs(W)
-normalization_factor = torch.sum(abs_W, dim=1, keepdim=True)
-
-Upost = torch.sum(abs_W * Ucap, dim=1) / normalization_factor
-z_x_post = torch.sum(abs_W * z_x, dim=1) / normalization_factor
-z_u_post = torch.sum(abs_W * z_u, dim=1) / normalization_factor
-
 torch.save({
     'Weight Matrix W': W,
     'Input Weight Matrix P': P,
     'Readout Weights': read_out,
-    'Ucap': Ucap,
-    'z_u': z_u,
-    'z_x': z_x,
-    'Upost': Upost,
-    'z_u_post': z_u_post,
-    'z_x_post': z_x_post,
-}, 'CB-RNN-tied-STP-weights.pth')
+},'Dale-CB-weights.pth')

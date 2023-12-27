@@ -14,24 +14,24 @@ import numpy as np
 models = ['CB-GRU', 'CB-RNN', 'CB-RNN-tied', 'Dale-CB', 'CB-GRU-STP', 'CB-RNN-STP', 'CB-RNN-tied-STP']
 input_situations = ['Sigmoid', 'ReLU']
 performance = np.random.rand(len(models), len(input_situations))
-'''
+
 # 01 CB-GRU
 performance[0,:] = [80.10, 83.09]
 # 02 CB-RNN
 performance[1,:] = [85.44, 86.88]
 # 03 CB-RNN-tied
-performance[2,:] = [80.91, ]
+performance[2,:] = [80.91, 79.84]
 # 04 Dale-CB
 performance[3,:] = [81.93, 77.26]
 # 05 CB-GRU-STP
-performance[4,:] = [, ]
+performance[4,:] = [80.93,9 ]
 # 06 CB-RNN-STP
-performance[5,:] = [, ]
+performance[5,:] = [81.37,9 ]
 # 07 CB-RNN-tied-STP
-performance[6,:] = [, ]
+performance[6,:] = [77.01,9 ]
 # Set the width of each bar
 bar_width = 0.2
-'''
+
 # Set the positions of the bars on the x-axis
 x = np.arange(len(models))
 
