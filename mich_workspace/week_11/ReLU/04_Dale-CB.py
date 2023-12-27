@@ -87,7 +87,7 @@ test_data = datasets.MNIST(
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 16
+input_size = 8
 sequence_length = 28*28//input_size
 hidden_size = 24
 num_layers = 1
@@ -135,8 +135,8 @@ class Dale_CBcell(nn.Module):
         # Update gate z_t
         # K and W are unbounded free parameters   
         # C represents  current based portion of connectivity       
-        self.K = torch.nn.Parameter(torch.empty(self.hidden_size, self.hidden_size))
-        self.C = torch.nn.Parameter(torch.empty(self.hidden_size, self.hidden_size))
+        self.K = torch.nn.Parameter(self.init_dale(self.hidden_size, self.hidden_size))
+        self.C = torch.nn.Parameter(self.init_dale(self.hidden_size, self.hidden_size))
         self.P_z = torch.nn.Parameter(torch.empty(self.hidden_size, input_size))
         self.b_z = torch.nn.Parameter(torch.empty(self.hidden_size, 1))   
         # Potentials are initialised with right signs
@@ -167,7 +167,18 @@ class Dale_CBcell(nn.Module):
         # init b_z to be log 1/99
         nn.init.constant_(self.b_z, torch.log(torch.tensor(1/99)))
 
-        
+    def init_dale(self, rows, cols):
+        # Dale's law with equal excitatory and inhibitory neurons
+        exci = torch.empty((rows, cols//2)).exponential_(1.0)
+        inhi = -torch.empty((rows, cols//2)).exponential_(1.0)
+        weights = torch.cat((exci, inhi), dim=1)
+        weights = self.adjust_spectral(weights)
+        return weights
+
+    def adjust_spectral(self, weights, desired_radius=1.5):
+        values, _ = torch.linalg.eig(weights @ weights.T)
+        radius = values.abs().max()
+        return weights * (desired_radius / radius)
 
     @property
     def r_t(self):

@@ -87,7 +87,7 @@ test_data = datasets.MNIST(
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 16
+input_size = 8
 sequence_length = 28*28//input_size
 hidden_size = 24
 num_layers = 1
@@ -184,7 +184,7 @@ class CB_RNN_STPcell(nn.Module):
 
     @property
     def r_t(self):
-        return self.relu(self.v_t)
+        return self.sigmoid(self.v_t)
 
     def forward(self, x):        
         if self.v_t.dim() == 3:           

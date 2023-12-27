@@ -87,7 +87,7 @@ test_data = datasets.MNIST(
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 16
+input_size = 8
 sequence_length = 28*28//input_size
 hidden_size = 24
 num_layers = 1
@@ -340,4 +340,4 @@ print('Accuracy of the model:{}%'.format(test_acc))
 # stride length 4
 # input length 4, Accuracy of the model:
 # input length 8, Accuracy of the model:
-# input length 12, Accuracy of the model:
+# input length 16, Accuracy of the model:

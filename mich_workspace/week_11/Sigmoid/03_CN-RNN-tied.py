@@ -87,7 +87,7 @@ test_data = datasets.MNIST(
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 16
+input_size = 8
 sequence_length = 28*28//input_size
 hidden_size = 24
 num_layers = 1
@@ -339,3 +339,14 @@ print('Accuracy of the model:{}%'.format(test_acc))
 # input length 4, Accuracy of the model:
 # input length 8, Accuracy of the model:
 # input length 16, Accuracy of the model:
+
+# Retrieve weights
+P = model.lstm.rnncell.P.detach().cpu().numpy()
+W = model.lstm.rnncell.W.detach().cpu().numpy()
+read_out = model.fc.weight.detach().cpu().numpy()
+
+torch.save({
+    'Weight Matrix W': W,
+    'Input Weight Matrix P': P,
+    'Readout Weights': read_out,
+},'sigmoid_CB-RNN-tied-weights.pth')

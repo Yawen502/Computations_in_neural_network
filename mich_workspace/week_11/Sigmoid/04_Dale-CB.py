@@ -87,13 +87,13 @@ test_data = datasets.MNIST(
 from torch import nn
 import torch.nn.functional as F
 
-input_size = 16
+input_size = 8
 sequence_length = 28*28//input_size
 hidden_size = 24
 num_layers = 1
 num_classes = 10
 batch_size = 40
-num_epochs = 10
+num_epochs = 1
 learning_rate = 0.01
 stride_number = 4
 
@@ -135,8 +135,8 @@ class Dale_CBcell(nn.Module):
         # Update gate z_t
         # K and W are unbounded free parameters   
         # C represents  current based portion of connectivity       
-        self.K = torch.nn.Parameter(torch.empty(self.hidden_size, self.hidden_size))
-        self.C = torch.nn.Parameter(torch.empty(self.hidden_size, self.hidden_size))
+        self.K = torch.nn.Parameter(self.init_dale(self.hidden_size, self.hidden_size))
+        self.C = torch.nn.Parameter(self.init_dale(self.hidden_size, self.hidden_size))
         self.P_z = torch.nn.Parameter(torch.empty(self.hidden_size, input_size))
         self.b_z = torch.nn.Parameter(torch.empty(self.hidden_size, 1))   
         # Potentials are initialised with right signs
@@ -167,6 +167,18 @@ class Dale_CBcell(nn.Module):
         # init b_z to be log 1/99
         nn.init.constant_(self.b_z, torch.log(torch.tensor(1/99)))
 
+    def init_dale(self, rows, cols):
+        # Dale's law with equal excitatory and inhibitory neurons
+        exci = torch.empty((rows, cols//2)).exponential_(1.0)
+        inhi = -torch.empty((rows, cols//2)).exponential_(1.0)
+        weights = torch.cat((exci, inhi), dim=1)
+        weights = self.adjust_spectral(weights)
+        return weights
+
+    def adjust_spectral(self, weights, desired_radius=1.5):
+        values, _ = torch.linalg.eig(weights @ weights.T)
+        radius = values.abs().max()
+        return weights * (desired_radius / radius)
         
 
     @property
@@ -189,12 +201,15 @@ class Dale_CBcell(nn.Module):
         W_E = self.relu(W_E)
         W_I = -self.relu(-W_I)
         W = torch.cat((W_E, W_I), 1)
+        self.W = W
 
         ### Update Equations ###
         self.z_t = torch.zeros(self.hidden_size, 1)
         self.z_t = self.dt * self.sigmoid(torch.matmul(K , self.r_t) + torch.matmul(self.P_z, x) + self.b_z)
         self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(W, self.r_t) + torch.matmul(self.P, x) + self.b_v)
-        self.v_t = torch.transpose(self.v_t, 0, 1)                
+        self.v_t = torch.transpose(self.v_t, 0, 1)      
+        excitatory = self.v_t[:, :self.hidden_size//2]
+        self.excitatory = torch.cat((excitatory, torch.zeros_like(excitatory)), 1)    
 
 class Dale_CB_batch(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
@@ -208,7 +223,7 @@ class Dale_CB_batch(nn.Module):
                 #print(x.shape)
                 x_slice = torch.transpose(x[:,n,:], 0, 1)
                 self.rnncell(x_slice)
-        return self.rnncell.v_t             
+        return self.rnncell.excitatory            
             
 class Dale_CB(nn.Module):
     
@@ -350,4 +365,15 @@ print('Accuracy of the model:{}%'.format(test_acc))
 # stride length 4
 # input length 4, Accuracy of the model:
 # input length 8, Accuracy of the model:
-# input length 16, Accuracy of the model: 74.60
+# input length 16, Accuracy of the model:
+
+# Retrieve weights
+P = model.lstm.rnncell.P.detach().cpu().numpy()
+W = model.lstm.rnncell.W.detach().cpu().numpy()
+read_out = model.fc.weight.detach().cpu().numpy()
+
+torch.save({
+    'Weight Matrix W': W,
+    'Input Weight Matrix P': P,
+    'Readout Weights': read_out,
+},'Dale-CB-weights.pth')
