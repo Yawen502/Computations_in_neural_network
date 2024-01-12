@@ -93,7 +93,7 @@ hidden_size = 24
 num_layers = 1
 num_classes = 10
 batch_size = 40
-num_epochs = 10
+num_epochs = 3
 learning_rate = 0.01
 stride_number = 4
 
@@ -194,14 +194,14 @@ class Dale_CB_STPcell(nn.Module):
         return weights
 
     def adjust_spectral(self, weights, desired_radius=1.5):
-        values, _ = torch.linalg.eig(weights @ weights.T)
+        values,_ = torch.linalg.eig(weights@weights.T)
         radius = values.abs().max()
         return weights * (desired_radius / radius)
         
 
     @property
     def r_t(self):
-        return self.sigmoid(self.v_t)
+        return self.relu(self.v_t)
 
     def forward(self, x):        
         if self.v_t.dim() == 3:           
@@ -401,14 +401,34 @@ print('Accuracy of the model:{}%'.format(test_acc))
 # input length 4, Accuracy of the model:
 # input length 8, Accuracy of the model:
 # input length 16, Accuracy of the model:
-
+'''
 # Retrieve weights
 P = model.lstm.rnncell.P.detach().cpu().numpy()
 W = model.lstm.rnncell.W.detach().cpu().numpy()
 read_out = model.fc.weight.detach().cpu().numpy()
 
+
+# Retrieve Ucap, z_u, z_x
+Ucap = model.lstm.rnncell.Ucap
+z_u = model.lstm.rnncell.z_u
+z_x = model.lstm.rnncell.z_x
+
+# Assuming W, Ucap, z_x, and z_u are PyTorch tensors
+abs_W = torch.abs(W)
+normalization_factor = torch.sum(abs_W, dim=1, keepdim=True)
+
+Upost = torch.sum(abs_W * Ucap, dim=1) / normalization_factor
+z_x_post = torch.sum(abs_W * z_x, dim=1) / normalization_factor
+z_u_post = torch.sum(abs_W * z_u, dim=1) / normalization_factor
+
 torch.save({
     'Weight Matrix W': W,
     'Input Weight Matrix P': P,
     'Readout Weights': read_out,
-},'Dale-CB-weights.pth')
+    'Ucap': Ucap,
+    'z_u': z_u,
+    'z_x': z_x,
+    'Upost': Upost,
+    'z_u_post': z_u_post,
+    'z_x_post': z_x_post,
+}, 'Dale-CB-STP-weights.pth')'''

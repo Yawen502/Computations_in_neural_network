@@ -93,7 +93,7 @@ hidden_size = 24
 num_layers = 1
 num_classes = 10
 batch_size = 40
-num_epochs = 1
+num_epochs = 10
 learning_rate = 0.01
 stride_number = 4
 
@@ -176,7 +176,8 @@ class Dale_CBcell(nn.Module):
         return weights
 
     def adjust_spectral(self, weights, desired_radius=1.5):
-        values, _ = torch.linalg.eig(weights @ weights.T)
+        #values, _ = torch.linalg.eig(weights @ weights.T)
+        values = torch.linalg.svdvals(weights)
         radius = values.abs().max()
         return weights * (desired_radius / radius)
         
@@ -366,7 +367,7 @@ print('Accuracy of the model:{}%'.format(test_acc))
 # input length 4, Accuracy of the model:
 # input length 8, Accuracy of the model:
 # input length 16, Accuracy of the model:
-
+'''
 # Retrieve weights
 P = model.lstm.rnncell.P.detach().cpu().numpy()
 W = model.lstm.rnncell.W.detach().cpu().numpy()
@@ -376,4 +377,4 @@ torch.save({
     'Weight Matrix W': W,
     'Input Weight Matrix P': P,
     'Readout Weights': read_out,
-},'Dale-CB-weights.pth')
+},'Dale-CB-weights.pth')'''

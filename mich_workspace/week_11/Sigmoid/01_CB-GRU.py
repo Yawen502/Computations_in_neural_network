@@ -327,7 +327,7 @@ with torch.no_grad():
 
 test_acc = 100 * correct / total
 print('Accuracy of the model:{}%'.format(test_acc))
-
+torch.save(model.state_dict(), 'model_weights.pth')
 # stride length 4
 # input length 4, Accuracy of the model:
 # input length 8, Accuracy of the model:
