@@ -25,27 +25,28 @@ X_history = np.squeeze(X_history)
 U_history = np.squeeze(U_history)
 v_t_history = np.squeeze(v_t_history)
 
+print(X_history.shape)
 v_t_history = np.transpose(v_t_history)
 
 # change device to cpu
 def plot_dynamics(X_history, U_history, v_t_history):
-    timesteps = np.arange(0, X_history.shape[0])
+    timesteps = np.arange(0, 100)
     plt.figure(figsize=(18, 6))
 
     plt.subplot(1, 3, 1)
-    plt.plot(timesteps, X_history)
+    plt.plot(timesteps, X_history.T)
     plt.title('X Dynamics')
     plt.xlabel('Timestep')
     plt.ylabel('X Value')
 
     plt.subplot(1, 3, 2)
-    plt.plot(timesteps, U_history)
+    plt.plot(timesteps, U_history.T)
     plt.title('U Dynamics')
     plt.xlabel('Timestep')
     plt.ylabel('U Value')
 
     plt.subplot(1, 3, 3)
-    plt.plot(timesteps, v_t_history)
+    plt.plot(timesteps, v_t_history.T)
     plt.title('v_t Dynamics')
     plt.xlabel('Timestep')
     plt.ylabel('v_t Value')
@@ -54,9 +55,8 @@ def plot_dynamics(X_history, U_history, v_t_history):
     plt.show()
 
 # Plot first 3 neurons on the same plot
-plot_dynamics(X_history[:, :5], U_history[:, :5], v_t_history[:, :5])
-# Plot next 5 neurons on the same plot
-plot_dynamics(X_history[:, 5:10], U_history[:, 5:10], v_t_history[:, 5:10])
-plot_dynamics(X_history[:, 20:24], U_history[:, 20:24], v_t_history[:, 20:24])
+X_history = np.average(X_history, axis=0)
+U_history = np.average(U_history, axis=0)
+v_t_history = np.average(v_t_history, axis=0)
 
-
+plot_dynamics(X_history, U_history, v_t_history)

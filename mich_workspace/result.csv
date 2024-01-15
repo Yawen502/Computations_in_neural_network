@@ -15,3 +15,5 @@
 06 with input size:16, test accuracy:9.8
 06 with input size:8, test accuracy:9.8
 06 with input size:8, test accuracy:9.8
+01_simple_GRU with input size:8, test accuracy:10.28
+01_simple_GRU with input size:8, test accuracy:90.96

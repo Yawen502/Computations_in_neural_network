@@ -190,6 +190,11 @@ class CB_RNN_tiedcell(nn.Module):
             self.v_t = self.v_t[0]
         self.v_t = torch.transpose(self.v_t, 0, 1)
 
+        self.X_history = []
+        self.U_history = []
+        self.v_t_history = []
+        self.z_t_history = []
+
         ### Constraints###
         e = self.softplus(self.e)
         e_p = self.softplus(self.e_p)
@@ -214,7 +219,12 @@ class CB_RNN_tiedcell(nn.Module):
         ### Update Equations ###
         self.z_t = self.dt * self.sigmoid(torch.matmul(K , self.r_t) + torch.matmul(P_z, x) + self.b_z)
         self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.W, self.U*self.X*self.r_t) + torch.matmul(self.P, x) + self.b_v)
-        self.v_t = torch.transpose(self.v_t, 0, 1)                
+        self.v_t = torch.transpose(self.v_t, 0, 1)      
+
+        self.X_history.append(self.X.clone().detach())
+        self.U_history.append(self.U.clone().detach())
+        self.v_t_history.append(self.v_t.clone().detach())
+        self.z_t_history.append(self.z_t.clone().detach())       
 
 class CB_RNN_tied_batch(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
@@ -352,6 +362,11 @@ train_acc = train(num_epochs, model, loaders)
 'Testing Accuracy'
 # Test the model
 model.eval()
+X_history = []
+U_history = []
+v_t_history = []
+z_t_history = []
+
 with torch.no_grad():
     total_loss = 0
     correct = 0
@@ -364,27 +379,19 @@ with torch.no_grad():
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
         correct += (predicted ==labels).sum().item()
+        X_history.append(model.lstm.rnncell.X_history)
+        U_history.append(model.lstm.rnncell.U_history)
+        v_t_history.append(model.lstm.rnncell.v_t_history)
+        z_t_history.append(model.lstm.rnncell.z_t_history)
 
 test_acc = 100 * correct / total
 print('Accuracy of the model:{}%'.format(test_acc))
 
-# Retrieve weights
-P = model.lstm.rnncell.P.detach().cpu().numpy()
-W = model.lstm.rnncell.W.detach().cpu().numpy()
-read_out = model.fc.weight.detach().cpu().numpy()
-
-
-# Retrieve Ucap, z_u, z_x
-Ucap = model.lstm.rnncell.Ucap.detach().cpu().numpy()
-z_u = model.lstm.rnncell.z_u.detach().cpu().numpy()
-z_x = model.lstm.rnncell.z_x.detach().cpu().numpy()
-
-
 torch.save({
-    'W': W,
-    'P': P,
-    'read_out': read_out,
-    'Ucap': Ucap,
-    'z_u': z_u,
-    'z_x': z_x,
-}, '07_CN-RNN-tied-STP.pth')
+    'X_history': X_history,
+    'U_history': U_history,
+    'v_t_history': v_t_history,
+    'z_t_history': z_t_history,
+}, 'functional_07.pth')
+
+

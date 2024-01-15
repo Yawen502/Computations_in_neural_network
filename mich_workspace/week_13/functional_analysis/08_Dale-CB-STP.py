@@ -208,6 +208,11 @@ class Dale_CB_STPcell(nn.Module):
             self.v_t = self.v_t[0]
         self.v_t = torch.transpose(self.v_t, 0, 1)
 
+        self.X_history = []
+        self.U_history = []
+        self.v_t_history = []
+        self.z_t_history = []
+
         ### Constraints###
         K = self.softplus(self.K)
         C = self.softplus(self.C)
@@ -243,7 +248,14 @@ class Dale_CB_STPcell(nn.Module):
         self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(W, self.U*self.X*self.r_t) + torch.matmul(self.P, x) + self.b_v)
         self.v_t = torch.transpose(self.v_t, 0, 1)      
         excitatory = self.v_t[:, :self.hidden_size//2]
+
+        self.X_history.append(self.X.clone().detach())
+        self.U_history.append(self.U.clone().detach())
+        self.v_t_history.append(self.v_t.clone().detach())
+        self.z_t_history.append(self.z_t.clone().detach())  
+
         self.excitatory = torch.cat((excitatory, torch.zeros_like(excitatory)), 1)    
+
 
 class Dale_CB_STP_batch(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
@@ -381,6 +393,11 @@ train_acc = train(num_epochs, model, loaders)
 'Testing Accuracy'
 # Test the model
 model.eval()
+X_history = []
+U_history = []
+v_t_history = []
+z_t_history = []
+
 with torch.no_grad():
     total_loss = 0
     correct = 0
@@ -393,7 +410,10 @@ with torch.no_grad():
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
         correct += (predicted ==labels).sum().item()
-
+        X_history.append(model.lstm.rnncell.X_history)
+        U_history.append(model.lstm.rnncell.U_history)
+        v_t_history.append(model.lstm.rnncell.v_t_history)
+        z_t_history.append(model.lstm.rnncell.z_t_history)
 test_acc = 100 * correct / total
 print('Accuracy of the model:{}%'.format(test_acc))
 
@@ -401,7 +421,14 @@ print('Accuracy of the model:{}%'.format(test_acc))
 # input length 4, Accuracy of the model:
 # input length 8, Accuracy of the model:
 # input length 16, Accuracy of the model:
-'''
+torch.save({
+    'X_history': X_history,
+    'U_history': U_history,
+    'v_t_history': v_t_history,
+    'z_t_history': z_t_history,
+}, 'functional_08.pth')
+
+
 # Retrieve weights
 P = model.lstm.rnncell.P.detach().cpu().numpy()
 W = model.lstm.rnncell.W.detach().cpu().numpy()
@@ -413,14 +440,6 @@ Ucap = model.lstm.rnncell.Ucap
 z_u = model.lstm.rnncell.z_u
 z_x = model.lstm.rnncell.z_x
 
-# Assuming W, Ucap, z_x, and z_u are PyTorch tensors
-abs_W = torch.abs(W)
-normalization_factor = torch.sum(abs_W, dim=1, keepdim=True)
-
-Upost = torch.sum(abs_W * Ucap, dim=1) / normalization_factor
-z_x_post = torch.sum(abs_W * z_x, dim=1) / normalization_factor
-z_u_post = torch.sum(abs_W * z_u, dim=1) / normalization_factor
-
 torch.save({
     'Weight Matrix W': W,
     'Input Weight Matrix P': P,
@@ -428,7 +447,4 @@ torch.save({
     'Ucap': Ucap,
     'z_u': z_u,
     'z_x': z_x,
-    'Upost': Upost,
-    'z_u_post': z_u_post,
-    'z_x_post': z_x_post,
-}, 'Dale-CB-STP-weights.pth')'''
+}, 'analysis_08.pth')

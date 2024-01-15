@@ -191,6 +191,9 @@ class Dale_CBcell(nn.Module):
             self.v_t = self.v_t[0]
         self.v_t = torch.transpose(self.v_t, 0, 1)
 
+        self.v_t_history = []
+        self.z_t_history = []
+
         ### Constraints###
         K = self.softplus(self.K)
         C = self.softplus(self.C)
@@ -209,6 +212,9 @@ class Dale_CBcell(nn.Module):
         self.z_t = self.dt * self.sigmoid(torch.matmul(K , self.r_t) + torch.matmul(self.P_z, x) + self.b_z)
         self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(W, self.r_t) + torch.matmul(self.P, x) + self.b_v)
         self.v_t = torch.transpose(self.v_t, 0, 1)      
+
+        self.v_t_history.append(self.v_t.clone().detach())
+        self.z_t_history.append(self.z_t.clone().detach())      
         excitatory = self.v_t[:, :self.hidden_size//2]
         self.excitatory = torch.cat((excitatory, torch.zeros_like(excitatory)), 1)    
 
@@ -347,6 +353,9 @@ train_acc = train(num_epochs, model, loaders)
 'Testing Accuracy'
 # Test the model
 model.eval()
+
+v_t_history = []
+z_t_history = []
 with torch.no_grad():
     total_loss = 0
     correct = 0
@@ -360,18 +369,13 @@ with torch.no_grad():
         total += labels.size(0)
         correct += (predicted ==labels).sum().item()
 
+        v_t_history.append(model.lstm.rnncell.v_t_history)
+        z_t_history.append(model.lstm.rnncell.z_t_history)
+
 test_acc = 100 * correct / total
 print('Accuracy of the model:{}%'.format(test_acc))
 
-# Retrieve weights
-P = model.lstm.rnncell.P.detach().cpu().numpy()
-W = model.lstm.rnncell.W.detach().cpu().numpy()
-read_out = model.fc.weight.detach().cpu().numpy()
-
-
-
 torch.save({
-    'W': W,
-    'P': P,
-    'read_out': read_out,
-}, '04_Dale-CB.pth')
+    'v_t_history': v_t_history,
+    'z_t_history': z_t_history,
+}, 'functional_04.pth')

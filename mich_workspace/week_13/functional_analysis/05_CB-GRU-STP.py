@@ -192,6 +192,7 @@ class CB_GRU_STPcell(nn.Module):
         self.X_history = []
         self.U_history = []
         self.v_t_history = []
+        self.z_t_history = []
 
         ### STP model ###
         x = torch.transpose(x, 0, 1)
@@ -216,7 +217,8 @@ class CB_GRU_STPcell(nn.Module):
 
         self.X_history.append(self.X.clone().detach())
         self.U_history.append(self.U.clone().detach())
-        self.v_t_history.append(self.v_t.clone().detach())      
+        self.v_t_history.append(self.v_t.clone().detach())
+        self.z_t_history.append(self.z_t.clone().detach())      
 
 class CB_GRU_STP_batch(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
@@ -355,6 +357,10 @@ train_acc = train(num_epochs, model, loaders)
 'Testing Accuracy'
 # Test the model
 model.eval()
+X_history = []
+U_history = []
+v_t_history = []
+z_t_history = []
 with torch.no_grad():
     total_loss = 0
     correct = 0
@@ -367,25 +373,24 @@ with torch.no_grad():
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
         correct += (predicted ==labels).sum().item()
+        X_history.append(model.lstm.rnncell.X_history)
+        U_history.append(model.lstm.rnncell.U_history)
+        v_t_history.append(model.lstm.rnncell.v_t_history)
+        z_t_history.append(model.lstm.rnncell.z_t_history)
 
-test_acc = 100 * correct / total
-print('Accuracy of the model:{}%'.format(test_acc))
-
-with torch.no_grad():
-    single_image, single_label = next(iter(loaders['test']))
-    model.eval()
-    model(single_image.reshape(-1, sequence_length, input_size).to(device))
-
-    X_history = model.lstm.rnncell.X_history
-    U_history = model.lstm.rnncell.U_history
-    v_t_history = model.lstm.rnncell.v_t_history
-    X_history = X_history.cpu().numpy()
-    U_history = U_history.cpu().numpy()
-    v_t_history = v_t_history.cpu().numpy()
+X_history = np.array(X_history)
+U_history = np.array(U_history)
+v_t_history = np.array(v_t_history)
+z_t_history = np.array(z_t_history)
+print('X_history shape: ', X_history.shape)
+print('U_history shape: ', U_history.shape)
+print('v_t_history shape: ', v_t_history.shape)
+print('z_t_history shape: ', z_t_history.shape)
 
 torch.save({
     'X_history': X_history,
     'U_history': U_history,
     'v_t_history': v_t_history,
+    'z_t_history': z_t_history,
 }, 'functional_05.pth')
 
