@@ -45,7 +45,7 @@ z_t  = np.mean(z_t , axis=1)
 
 # change device to cpu
 # Plot scatter plot of the data
-plt.subplots(figsize=(7, 7))
+plt.subplots(figsize=(5, 5))
 plt.subplot(2, 2, 1)
 plt.scatter(X , U )
 plt.xlabel('X')
@@ -74,7 +74,7 @@ plt.tight_layout()
 plt.show()
 
 # plot histogram of the four variables
-plt.subplots(figsize=(7, 7))
+plt.subplots(figsize=(5, 5))
 plt.subplot(2, 2, 1)
 plt.hist(X , bins=50)
 plt.xlabel('X')
