@@ -395,3 +395,24 @@ torch.save({
 }, 'functional_07.pth')
 
 
+# Retrieve weights
+P = model.lstm.rnncell.P.detach().cpu().numpy()
+W = model.lstm.rnncell.W.detach().cpu().numpy()
+read_out = model.fc.weight.detach().cpu().numpy()
+
+
+# Retrieve Ucap, z_u, z_x
+Ucap = model.lstm.rnncell.Ucap
+z_u = model.lstm.rnncell.z_u
+z_x = model.lstm.rnncell.z_x
+
+torch.save({
+    'Weight Matrix W': W,
+    'Input Weight Matrix P': P,
+    'Readout Weights': read_out,
+    'Ucap': Ucap,
+    'z_u': z_u,
+    'z_x': z_x,
+}, 'analysis_07.pth')
+
+#Accuracy of the model:65.16%

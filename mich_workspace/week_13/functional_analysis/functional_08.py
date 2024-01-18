@@ -12,7 +12,51 @@ X_history = data['X_history']
 U_history = data['U_history']
 v_t_history = data['v_t_history']
 z_t_history = data['z_t_history']
+
 W = weights['Weight Matrix W']
+P = weights['Input Weight Matrix P']
+read_out = weights['Readout Weights']
+Ucap = weights['Ucap']
+z_u = weights['z_u']
+z_x = weights['z_x']
+
+input_strength = np.linalg.norm(P, axis=1)
+# normalize
+input_strength = input_strength / np.max(input_strength)
+
+output_strength = np.linalg.norm(read_out, axis=0)
+# normalize
+output_strength = output_strength / np.max(output_strength)
+
+input_ratio = input_strength / (input_strength + output_strength)
+abs_W = np.abs(W)
+normalization_factor = np.sum(abs_W, axis=1)
+Ucap = Ucap.cpu().numpy()
+z_u = z_u.cpu().numpy()
+z_x = z_x.cpu().numpy()
+print(z_u.shape, z_x.shape, Ucap.shape)
+# reshape to (48,)
+Ucap = np.reshape(Ucap, (48,))
+z_u = np.reshape(z_u, (48,))
+z_x = np.reshape(z_x, (48,))
+Upost = np.sum(abs_W * Ucap, axis=0) / normalization_factor
+z_x_post = np.sum(abs_W * z_x, axis=0) / normalization_factor
+z_u_post = np.sum(abs_W * z_u, axis=0) / normalization_factor
+
+# Accuracy of the model:61.22%
+
+### Plot Input ratio ###
+# calculate l2 norm of each neuron for P
+import numpy as np
+import matplotlib.pyplot as plt
+
+input_strength = np.linalg.norm(P, axis=1)
+# normalize
+input_strength = input_strength / np.max(input_strength)
+
+output_strength = np.linalg.norm(read_out, axis=0)
+# normalize
+output_strength = output_strength / np.max(output_strength)
 
 
 print(type(X_history))
@@ -46,7 +90,58 @@ v_t  = np.mean(v_t , axis=0)
 v_t  = np.mean(v_t , axis=1)
 z_t  = np.mean(z_t , axis=0)
 z_t  = np.mean(z_t , axis=1)
+print(X.shape, U.shape, v_t.shape, z_t.shape)
+import pandas as pd
+import seaborn as sns
 
+
+# Assuming X, U, v_t, and z_t are numpy arrays of the same length
+data = {
+    r'$x_{mean}$': X,
+    r'$u_{mean}$': U,
+    '$v_t$': v_t,
+    '$z_t$': z_t,
+    'Ucap': Ucap,
+    r'$\tau_F$': z_u,
+    r'$\tau_D$': z_x,
+    'input_ratio': input_ratio
+}
+data2 = {
+    'Ucap': Ucap,
+    r'$\tau_F$': z_u,
+    r'$\tau_D$': z_x,
+    'input_ratio': input_ratio,
+}
+data3 = {
+    r'$x_{mean}$': X,
+    r'$u_{mean}$': U,
+    '$v_t$': v_t,
+    '$z_t$': z_t,
+}
+# Create a DataFrame
+df = pd.DataFrame(data)
+df2 = pd.DataFrame(data2)
+df3 = pd.DataFrame(data3)
+# Plotting using Seaborn
+#set plot size
+plt.figure(figsize=(7,7))
+sns.set_theme(style="ticks")
+#pair_plot = sns.pairplot(df3)  # Use hue='your_categorical_variable' if you have one
+#plt.show()
+#pair_plot2 = sns.pairplot(df2)  # Use hue='your_categorical_variable' if you have one
+#plt.show()
+
+# Sample DataFrame
+# df is your existing pandas DataFrame with two columns, for example, 'X' and 'U'
+
+# Creating a joint plot
+joint_plot = sns.jointplot(data=df, x=r'$u_{mean}$', y=r'$x_{mean}$', kind='scatter', height=4)
+#joint_plot = sns.jointplot(data=df, x=r'$u_{mean}$', y='Ucap', kind='scatter')
+joint_plot = sns.jointplot(data=df, x='$z_t$', y='Ucap', kind='scatter', height=4)
+# Display the plot
+plt.show()
+
+'''
 # change device to cpu
 # Plot scatter plot of the data
 plt.subplots(figsize=(7, 7))
@@ -104,3 +199,17 @@ plt.ylabel('Count')
 plt.title('1/z_t')
 plt.tight_layout()
 plt.show()
+
+# Plot a heatmap of W
+plt.figure( figsize=(7,7))
+# Large font
+# find max and mean of W
+
+plt.rcParams.update({'font.size': 15})
+plt.imshow(W, cmap='bwr', vmin=np.min(W), vmax=np.max(W))
+plt.colorbar()
+plt.xlabel('Pre-synaptic')
+plt.ylabel('Post-synaptic')
+plt.title('W')
+plt.show()
+'''

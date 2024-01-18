@@ -89,7 +89,7 @@ import torch.nn.functional as F
 
 input_size = 8
 sequence_length = 28*28//input_size
-hidden_size = 24
+hidden_size = 48
 num_layers = 1
 num_classes = 10
 batch_size = 40
@@ -194,7 +194,7 @@ class Dale_CB_STPcell(nn.Module):
         return weights
 
     def adjust_spectral(self, weights, desired_radius=1.5):
-        values,_ = torch.linalg.eig(weights@weights.T)
+        values= torch.linalg.svdvals(weights)
         radius = values.abs().max()
         return weights * (desired_radius / radius)
         
@@ -448,3 +448,5 @@ torch.save({
     'z_u': z_u,
     'z_x': z_x,
 }, 'analysis_08.pth')
+
+#Accuracy of the model:65.16%

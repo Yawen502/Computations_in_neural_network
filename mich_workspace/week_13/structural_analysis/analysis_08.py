@@ -5,13 +5,13 @@ import torch
 #pth_file = "Dale-CB-weights.pth"
 #pth_file = 'sigmoid_CB-RNN-tied-weights.pth'
 #Accuracy of the model:77.08%
-pth_file = '07_CN-RNN-tied-STP.pth'
+pth_file = 'analysis_08.pth'
 
 # Load the model or tensor from the .pth file
 data = torch.load(pth_file)
-W = data['W']
-P = data['P']
-read_out = data['read_out']
+W = data['Weight Matrix W']
+P = data['Input Weight Matrix P']
+read_out = data['Readout Weights']
 Ucap = data['Ucap']
 z_u = data['z_u']
 z_x = data['z_x']
@@ -43,6 +43,9 @@ plt.title('Input Strength vs Output Strength, Accuracy :61.22%')
 input_ratio = input_strength / (input_strength + output_strength)
 abs_W = np.abs(W)
 normalization_factor = np.sum(abs_W, axis=1)
+Ucap = Ucap.cpu().numpy()
+z_u = z_u.cpu().numpy()
+z_x = z_x.cpu().numpy()
 
 Upost = np.sum(abs_W * Ucap, axis=0) / normalization_factor
 z_x_post = np.sum(abs_W * z_x, axis=0) / normalization_factor
