@@ -1,0 +1,78 @@
+import torch
+import numpy as np
+from torch.utils.data import Dataset, DataLoader
+from sklearn.model_selection import train_test_split
+
+def memorypro_dataset(number):
+    # return an input vector with dimension (6, timesteps) and its target output with dimension (3, timestep)
+    # determine time intervals
+    gamma = 0.2
+    t_context = int(np.ceil(np.random.uniform(300, 700)))
+    t_stim = int(np.ceil(np.random.uniform(200, 1600)))
+    t_memory = int(np.ceil(np.random.uniform(200, 1600)))
+    t_response = int(np.ceil(np.random.uniform(300, 700)))
+    total = t_context + t_stim + t_memory + t_response
+    total = int(total)
+    print(total)
+    input_set = []
+    target_set = []
+    u0 = 0.1* np.sqrt(2/gamma)
+    for i in range(number):
+        # generate theta randomly from 0 to 2pi
+        theta = np.random.uniform(0, 2*np.pi)
+        print(theta)
+        u_fix = np.concatenate((np.repeat(1.0, total-t_response), np.repeat(0.0, t_response)), axis = None).reshape(total, 1)
+        u_mod1_sin = np.concatenate((np.repeat(0.0, t_context), np.repeat(np.sin(theta), t_stim), np.repeat(0.0, t_memory+t_response)))
+        u_mod1_sin = u_mod1_sin.reshape(total, 1)
+        u_mod1_cos = np.concatenate((np.repeat(0.0, t_context), np.repeat(np.cos(theta), t_stim), np.repeat(0.0, t_memory+t_response)))
+        u_mod1_cos = u_mod1_cos.reshape(total, 1)
+        u_mod1 = np.concatenate((u_mod1_sin, u_mod1_cos), axis = 1).reshape(total, 2)
+        u_mod2 = np.zeros((total, 2))
+        u_rule = np.zeros((total, 1))
+        u_noise = u0 * np.random.randn(6, total)   
+        u = np.concatenate((u_fix, u_mod1, u_mod2, u_rule), axis = 1).T 
+        input_set.append(u)
+
+        # then determine the target output
+        z_fix = u_fix
+        z_sin = np.concatenate((np.repeat(0.0, t_context+t_stim+t_memory), np.repeat(np.sin(theta),t_response)))
+        z_sin = z_sin.reshape(total, 1)
+        z_cos = np.concatenate((np.repeat(0.0, t_context+t_stim+t_memory), np.repeat(np.cos(theta),t_response)))
+        z_cos = z_cos.reshape(total, 1)
+        z = np.concatenate((z_fix, z_sin, z_cos), axis = 1).T
+        target_set.append(z)
+    input_set = np.array(input_set)
+    target_set = np.array(target_set)
+    return input_set, target_set
+
+# Assuming memorypro_dataset_fixed is already defined and available
+input_set, output_set = memorypro_dataset(10000)
+
+# Custom dataset class
+class MemoryProDataset(Dataset):
+    def __init__(self, inputs, targets):
+        self.inputs = inputs
+        self.targets = targets
+
+    def __len__(self):
+        return len(self.inputs)
+
+    def __getitem__(self, idx):
+        # Converting numpy arrays to tensors
+        input_tensor = torch.tensor(self.inputs[idx], dtype=torch.float32)
+        target_tensor = torch.tensor(self.targets[idx], dtype=torch.float32)
+        return input_tensor, target_tensor
+
+# Splitting the dataset into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(input_set, output_set, test_size=0.2, random_state=42)
+
+# Create dataset objects for training and testing sets
+train_dataset = MemoryProDataset(X_train, y_train)
+test_dataset = MemoryProDataset(X_test, y_test)
+
+# Create DataLoader for batching
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+torch.save(train_loader, 'train_loader.pt')
+torch.save(test_loader, 'test_loader.pt')

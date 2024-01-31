@@ -1,6 +1,3 @@
-# The first model gives the conductance model as we discussed
-# The second model is an simplified one using constant g
-# The third model is the simple GRU model, should be the strongest one
 
 'Data Preprocessing'
 import torch
