@@ -89,11 +89,11 @@ import torch.nn.functional as F
 
 input_size = 8
 sequence_length = 28*28//input_size
-hidden_size = 48
+hidden_size = 24
 num_layers = 1
 num_classes = 10
-batch_size = 40
-num_epochs = 3
+batch_size = 100
+num_epochs = 2
 learning_rate = 0.01
 stride_number = 4
 
@@ -122,31 +122,22 @@ for i, (images, labels) in enumerate(loaders['train']):
 
 'Model Definition'
 
-class Dale_CB_STPcell(nn.Module):
+class CB_RNN_STPcell(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers):
-        super(Dale_CB_STPcell, self).__init__()
+        super(CB_RNN_STPcell, self).__init__()
         self.hidden_size = hidden_size
     
         ### Parameters ###
         # voltage gate v_t 
+        self.W = torch.nn.Parameter(torch.empty(self.hidden_size, self.hidden_size))
         self.P = torch.nn.Parameter(torch.empty(self.hidden_size, input_size))           
         self.b_v = torch.nn.Parameter(torch.zeros(self.hidden_size, 1))   
 
         # Update gate z_t
-        # K and W are unbounded free parameters   
-        # C represents  current based portion of connectivity       
-        while True:
-            self.K = torch.nn.Parameter(self.init_dale(self.hidden_size, self.hidden_size))
-            self.C = torch.nn.Parameter(self.init_dale(self.hidden_size, self.hidden_size))
-            nse_K = self.NSE(self.K)
-            nse_C = self.NSE(self.C)
-            if nse_K > 0.90 and nse_C > 0.90:
-                break
+        # K and W are unbounded free parameters          
+        self.K = torch.nn.Parameter(torch.empty(self.hidden_size, self.hidden_size))
         self.P_z = torch.nn.Parameter(torch.empty(self.hidden_size, input_size))
         self.b_z = torch.nn.Parameter(torch.empty(self.hidden_size, 1))   
-        # Potentials are initialised with right signs
-        self.e_e = torch.nn.Parameter(torch.rand(1))
-        self.e_i = torch.nn.Parameter(-torch.rand(1))
 
         # Firing rate, Scaling factor and time step initialization
         self.v_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
@@ -164,10 +155,9 @@ class Dale_CB_STPcell(nn.Module):
         positive_glorot_init = lambda w: nn.init.uniform_(w, a=0, b=(1/math.sqrt(hidden_size)))
 
         # initialise matrices
-        # P and P_z are unconstrained
-        for w in self.P_z, self.P:
+        for w in self.W, self.P:
             glorot_init(w)
-        for w in self.K, self.C:
+        for w in self.K, self.P_z:
             positive_glorot_init(w)
         # init b_z to be log 1/99
         nn.init.constant_(self.b_z, torch.log(torch.tensor(1/99)))
@@ -190,29 +180,11 @@ class Dale_CB_STPcell(nn.Module):
         self.Ucap = 0.9 * self.sigmoid(self.c_U)
         self.Ucapclone = self.Ucap.clone().detach() 
 
-    def init_dale(self, rows, cols):
-        # Dale's law with equal excitatory and inhibitory neurons
-        exci = torch.empty((rows, cols//2)).exponential_(1.0)
-        inhi = -torch.empty((rows, cols//2)).exponential_(1.0)
-        weights = torch.cat((exci, inhi), dim=1)
-        weights = self.adjust_spectral(weights)
-        return weights
-
-    def adjust_spectral(self, weights, desired_radius=1.5):
-        values= torch.linalg.svdvals(weights)
-        radius = values.abs().max()
-        return weights * (desired_radius / radius)
-    
-    def NSE(self, weights):
-        values = torch.linalg.svdvals(weights)
-        normalised_v = values/sum(values)
-        H = -1/torch.log(torch.tensor(self.hidden_size)) * torch.sum(normalised_v * torch.log(normalised_v))
-        print(H)
-        return H
+        
 
     @property
     def r_t(self):
-        return self.relu(self.v_t)
+        return self.sigmoid(self.v_t)
 
     def forward(self, x):        
         if self.v_t.dim() == 3:           
@@ -220,17 +192,16 @@ class Dale_CB_STPcell(nn.Module):
         self.v_t = torch.transpose(self.v_t, 0, 1)
 
         ### Constraints###
-        K = self.softplus(self.K)
-        C = self.softplus(self.C)
-        # W is constructed using e*(K+C)
-        W_E = self.e_e * (K[:, :self.hidden_size//2] + C[:, :self.hidden_size//2])
-        W_I = self.e_i * (K[:, self.hidden_size//2:] + C[:, self.hidden_size//2:])
-        # print to see which device the tensor is on
-        # If sign of W do not obey Dale's law, then these terms to be 0
-        W_E = self.relu(W_E)
-        W_I = -self.relu(-W_I)
-        W = torch.cat((W_E, W_I), 1)
-        self.W = W
+        # No sign constraint on K and W
+        # set negative term of K to be 0
+        K = self.relu(self.K)
+        # use softmax to constrain P_z
+        P_z = self.softplus(self.P_z)
+
+        self.z_t_history = []
+        self.v_t_history = []
+        self.X_history = []
+        self.U_history = []
 
         ### STP model ###
         x = torch.transpose(x, 0, 1)
@@ -247,20 +218,21 @@ class Dale_CB_STPcell(nn.Module):
         self.U = torch.clamp(self.U, min=self.Ucapclone.repeat(1, x.size(0)).to(device), max=torch.ones_like(self.Ucapclone.repeat(1, x.size(0)).to(device)))
         x = torch.transpose(x, 0, 1)
 
-
         ### Update Equations ###
-        self.z_t = torch.zeros(self.hidden_size, 1)
-        self.z_t = self.dt * self.sigmoid(torch.matmul(K , self.r_t) + torch.matmul(self.P_z, x) + self.b_z)
-        self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(W, self.U*self.X*self.r_t) + torch.matmul(self.P, x) + self.b_v)
-        self.v_t = torch.transpose(self.v_t, 0, 1)      
-        excitatory = self.v_t[:, :self.hidden_size//2]
-        self.excitatory = torch.cat((excitatory, torch.zeros_like(excitatory)), 1)    
+        self.z_t = self.dt * self.sigmoid(torch.matmul(K , self.r_t) + torch.matmul(P_z, x) + self.b_z)
+        self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.W, self.U*self.X*self.r_t) + torch.matmul(self.P, x) + self.b_v)
+        self.v_t = torch.transpose(self.v_t, 0, 1)             
+
+        self.z_t_history.append(self.z_t.clone().detach())
+        self.v_t_history.append(self.v_t.clone().detach())
+        self.X_history.append(self.X.clone().detach())
+        self.U_history.append(self.U.clone().detach())
 
 
-class Dale_CB_STP_batch(nn.Module):
+class CB_RNN_STP_batch(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, batch_first=True):
-        super(Dale_CB_STP_batch, self).__init__()
-        self.rnncell = Dale_CB_STPcell(input_size, hidden_size, num_layers).to(device)
+        super(CB_RNN_STP_batch, self).__init__()
+        self.rnncell = CB_RNN_STPcell(input_size, hidden_size, num_layers).to(device)
         self.batch_first = batch_first
 
     def forward(self, x):
@@ -269,15 +241,15 @@ class Dale_CB_STP_batch(nn.Module):
                 #print(x.shape)
                 x_slice = torch.transpose(x[:,n,:], 0, 1)
                 self.rnncell(x_slice)
-        return self.rnncell.excitatory            
+        return self.rnncell.v_t             
             
-class Dale_CB_STP(nn.Module):
+class CB_RNN_STP(nn.Module):
     
     def __init__(self, input_size, hidden_size, num_layers, num_classes):
-        super(Dale_CB_STP, self).__init__()
+        super(CB_RNN_STP, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.lstm = Dale_CB_STP_batch(input_size, hidden_size, num_layers)
+        self.lstm = CB_RNN_STP_batch(input_size, hidden_size, num_layers)
         self.fc = nn.Linear(hidden_size, 10)
         pass
 
@@ -295,7 +267,7 @@ class Dale_CB_STP(nn.Module):
         pass                                    
 pass
 
-model = Dale_CB_STP(input_size, hidden_size, num_layers, num_classes).to(device)
+model = CB_RNN_STP(input_size, hidden_size, num_layers, num_classes).to(device)
 print(model)
 loss_func = nn.CrossEntropyLoss()
 
@@ -393,11 +365,6 @@ train_acc = train(num_epochs, model, loaders)
 'Testing Accuracy'
 # Test the model
 model.eval()
-X_history = []
-U_history = []
-v_t_history = []
-z_t_history = []
-
 with torch.no_grad():
     total_loss = 0
     correct = 0
@@ -410,43 +377,27 @@ with torch.no_grad():
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
         correct += (predicted ==labels).sum().item()
-        X_history.append(model.lstm.rnncell.X_history)
-        U_history.append(model.lstm.rnncell.U_history)
-        v_t_history.append(model.lstm.rnncell.v_t_history)
-        z_t_history.append(model.lstm.rnncell.z_t_history)
+
 test_acc = 100 * correct / total
 print('Accuracy of the model:{}%'.format(test_acc))
 
-# stride length 4
-# input length 4, Accuracy of the model:
-# input length 8, Accuracy of the model:
-# input length 16, Accuracy of the model:
+with torch.no_grad():
+    single_image, single_label = next(iter(loaders['test']))
+    model.eval()
+    # set variables to initial state
+    model.lstm.rnncell.X = torch.ones(model.hidden_size, 1, dtype=torch.float32).to(device)
+    model.lstm.rnncell.U = (model.lstm.rnncell.Ucapclone.repeat(1, 1)).to(device)
+    model.lstm.rnncell.v_t = torch.zeros(model.num_layers, 1, model.hidden_size).to(device)
+    model(single_image.reshape(-1, sequence_length, input_size).to(device))
+
+    z_t_history = model.lstm.rnncell.z_t_history
+    X_history = model.lstm.rnncell.X_history
+    U_history = model.lstm.rnncell.U_history
+    v_t_history = model.lstm.rnncell.v_t_history
+
 torch.save({
+    'z_t_history': z_t_history,
     'X_history': X_history,
     'U_history': U_history,
     'v_t_history': v_t_history,
-    'z_t_history': z_t_history,
-}, 'functional_08.pth')
-
-
-# Retrieve weights
-P = model.lstm.rnncell.P.detach().cpu().numpy()
-W = model.lstm.rnncell.W.detach().cpu().numpy()
-read_out = model.fc.weight.detach().cpu().numpy()
-
-
-# Retrieve Ucap, z_u, z_x
-Ucap = model.lstm.rnncell.Ucap
-z_u = model.lstm.rnncell.z_u
-z_x = model.lstm.rnncell.z_x
-
-torch.save({
-    'Weight Matrix W': W,
-    'Input Weight Matrix P': P,
-    'Readout Weights': read_out,
-    'Ucap': Ucap,
-    'z_u': z_u,
-    'z_x': z_x,
-}, 'analysis_08.pth')
-
-#Accuracy of the model:65.16%
+}, 'functional_06.pth')
