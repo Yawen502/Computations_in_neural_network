@@ -189,6 +189,10 @@ class Dale_CB_STPcell(nn.Module):
         self.U = torch.full((self.hidden_size, 1), 0.9, dtype=torch.float32).to(device)
         self.Ucap = 0.9 * self.sigmoid(self.c_U)
         self.Ucapclone = self.Ucap.clone().detach() 
+        self.X_history = []
+        self.U_history = []
+        self.v_t_history = []
+        self.z_t_history = []
 
     def init_dale(self, rows, cols):
         # Dale's law with equal excitatory and inhibitory neurons
@@ -254,7 +258,12 @@ class Dale_CB_STPcell(nn.Module):
         self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(W, self.U*self.X*self.r_t) + torch.matmul(self.P, x) + self.b_v)
         self.v_t = torch.transpose(self.v_t, 0, 1)      
         excitatory = self.v_t[:, :self.hidden_size//2]
-        self.excitatory = torch.cat((excitatory, torch.zeros_like(excitatory)), 1)    
+        self.excitatory = torch.cat((excitatory, torch.zeros_like(excitatory)), 1)  
+
+        self.X_history.append(self.X.clone().detach())
+        self.U_history.append(self.U.clone().detach())
+        self.v_t_history.append(self.v_t.clone().detach())
+        self.z_t_history.append(self.z_t.clone().detach())     
 
 
 class Dale_CB_STP_batch(nn.Module):
