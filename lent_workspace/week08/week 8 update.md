@@ -16,3 +16,12 @@ Comparison of model with/without pretraining and STP feature:
 ## FlipFlop Task with integration
 The output side detects two consecutive pulses happening within t_window, and produces a pulse with the same sign. After t_relax, the pulse is reset to 0. Any later output pulse overwrites the previous one.
 
+Sample:
+t_window = 5, t_relax = 10,  n_time = 64
+![image](https://github.com/Yawen502/Computations_in_neural_network/assets/71087503/a2c28800-9213-4fe0-abb3-e37344b27eec)
+
+
+t_window = 2, t_relax = 3, n_time = 100
+![image](https://github.com/Yawen502/Computations_in_neural_network/assets/71087503/c422598e-e74c-4dca-bc55-b8fe517ef7a1)
+
+When using GRU 
