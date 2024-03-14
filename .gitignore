@@ -9,3 +9,4 @@ data/MNIST/raw/t10k-images-idx3-ubyte
 /mich_workspace/data
 *.pkl
 *.pt
+/lent_workspace/week08/fixed-point-finder/data/MNIST
