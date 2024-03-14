@@ -9,9 +9,12 @@ import pdb
 import sys
 import numpy as np
 
-from FlipFlop_Dale_CB import FlipFlop
+#from FlipFlop_vanilla import FlipFlop
+#from FlipFlop_CB_GRU import FlipFlop
+from FlipFlop_multiscale import FlipFlop
 from FixedPointFinderTorch import FixedPointFinderTorch as FixedPointFinder
-from FlipFlopData import FlipFlopData
+from integret_flipflop import FlipFlopData
+#from integret_flipflop import FlipFlopData
 from plot_utils import plot_fps
 
 def train_FlipFlop():
@@ -51,9 +54,9 @@ def train_FlipFlop():
         input_size=n_bits,
         hidden_size=n_hidden,
         num_classes=n_bits)
-
+#learning rate 1./np.sqrt(batch_size)
     losses, grad_norms = model.train(train_data, valid_data,
-        learning_rate=1./np.sqrt(batch_size),
+        learning_rate=0.05,
         batch_size=batch_size)
 
     valid_predictions = model.predict(valid_data)
@@ -80,7 +83,7 @@ def find_fixed_points(model, valid_predictions):
     NOISE_SCALE = 0.5 # Standard deviation of noise added to initial states
     N_INITS = 1024 # The number of initial states to provide
     print(valid_predictions.keys())
-    n_bits = valid_predictions['targets'].shape[2]
+    n_bits = valid_predictions['output'].shape[2]
 
     '''Fixed point finder hyperparameters. See FixedPointFinder.py for detailed
     descriptions of available hyperparameters.'''

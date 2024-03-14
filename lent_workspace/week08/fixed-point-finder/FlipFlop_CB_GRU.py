@@ -71,104 +71,54 @@ class FlipFlopDataset(Dataset):
 			}
 
 class Dale_CBcell(nn.Module):
-	def __init__(self, input_size, hidden_size
-					):
-		super(Dale_CBcell, self).__init__()
-		self.hidden_size = hidden_size
+    def __init__(self, input_size, hidden_size):
+        super(Dale_CBcell, self).__init__()
+        self.hidden_size = hidden_size
+    
+        # Rest gate r_t 
+        self.W = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
+        self.P = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))           
+        self.b_v = torch.nn.Parameter(torch.rand(self.hidden_size, 1))   
 
-		### Parameters ###
-		# voltage gate v_t 
-		self.P = torch.nn.Parameter(torch.empty(self.hidden_size, input_size))           
-		self.b_v = torch.nn.Parameter(torch.zeros(self.hidden_size, 1))   
+        # Update gate z_t
+        # K is always positive            
+        self.b_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))     
+        self.K = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
+        self.P_z = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))
 
-		# Update gate z_t
-		# K and W are unbounded free parameters   
-		# C represents  current based portion of connectivity       
-		self.K = torch.nn.Parameter(self.init_dale(self.hidden_size, self.hidden_size))
-		self.C = torch.nn.Parameter(self.init_dale(self.hidden_size, self.hidden_size))
-		self.P_z = torch.nn.Parameter(torch.empty(self.hidden_size, input_size))
-		self.b_z = torch.nn.Parameter(torch.empty(self.hidden_size, 1))   
-		# Potentials are initialised with right signs
-		self.e_e = torch.nn.Parameter(torch.rand(1))
-		self.e_i = torch.nn.Parameter(-torch.rand(1))
+        # Firing rate, Scaling factor and time step initialization
+        self.v_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
 
-		# Firing rate, Scaling factor and time step initialization
-		self.v_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
+        # dt is a constant
+        self.dt = nn.Parameter(torch.tensor(0.001), requires_grad = False)
 
-		# dt is a constant
-		self.dt = torch.tensor(0.1)
+        # Nonlinear functions
+        self.Sigmoid = nn.Sigmoid()
+        self.Tanh = nn.Tanh()
+        self.ReLU = nn.ReLU()
+        for name, param in self.named_parameters():
+            nn.init.uniform_(param, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
+    @property
+    def r_t(self):
+        return self.ReLU(self.v_t)
 
-		### Nonlinear functions ###
-		self.sigmoid = nn.Sigmoid()
-		self.softplus = nn.Softplus()
-		self.relu = nn.ReLU()
-		self.tanh = nn.Tanh()
+    def forward(self, x):        
+        if self.v_t.dim() == 3:           
+            self.v_t = self.v_t[0]
+        self.v_t = torch.transpose(self.v_t, 0, 1)
+        # No sign constraint on K and W
 
-		### Initialisation ###
-		glorot_init = lambda w: nn.init.uniform_(w, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
-		positive_glorot_init = lambda w: nn.init.uniform_(w, a=0, b=(1/math.sqrt(hidden_size)))
-
-		# initialise matrices
-		# P and P_z are unconstrained
-		for w in self.P_z, self.P:
-			glorot_init(w)
-		for w in self.K, self.C:
-			positive_glorot_init(w)
-		# init b_z to be log 1/99
-		nn.init.constant_(self.b_z, torch.log(torch.tensor(1/99)))
-
-
-	def init_dale(self, rows, cols):
-		# Dale's law with equal excitatory and inhibitory neurons
-		exci = torch.empty((rows, cols//2)).exponential_(1.0)
-		inhi = -torch.empty((rows, cols//2)).exponential_(1.0)
-		weights = torch.cat((exci, inhi), dim=1)
-		weights = self.adjust_spectral(weights)
-		return weights
-
-	def adjust_spectral(self, weights, desired_radius=1.5):
-		#values, _ = torch.linalg.eig(weights @ weights.T)
-		values = torch.linalg.svdvals(weights)
-		radius = values.abs().max()
-		return weights * (desired_radius / radius)
-		
-
-	@property
-	def r_t(self):
-		return self.sigmoid(self.v_t)
-
-	def forward(self, x):        
-		if self.v_t.dim() == 3:           
-			self.v_t = self.v_t[0]
-		self.v_t = torch.transpose(self.v_t, 0, 1)
-
-		### Constraints###
-		K = self.softplus(self.K)
-		C = self.softplus(self.C)
-		# W is constructed using e*(K+C)
-		W_E = self.e_e * (K[:, :self.hidden_size//2] + C[:, :self.hidden_size//2])
-		W_I = self.e_i * (K[:, self.hidden_size//2:] + C[:, self.hidden_size//2:])
-		# print to see which device the tensor is on
-		# If sign of W do not obey Dale's law, then these terms to be 0
-		W_E = self.relu(W_E)
-		W_I = -self.relu(-W_I)
-		W = torch.cat((W_E, W_I), 1)
-		self.W = W
-
-		### Update Equations ###
-		input_mask = torch.ones_like(self.P)
-		input_mask[self.hidden_size//4:self.hidden_size//2,:] = 0
-		input_mask[3*self.hidden_size//4:,:] = 0
-		P = self.P * input_mask
-
-		self.z_t = torch.zeros(self.hidden_size, 1)
-		x = torch.transpose(x, 0, 1)
-		self.z_t = self.dt * self.sigmoid(torch.matmul(K , self.r_t) + torch.matmul(self.P_z, x) + self.b_z)
-		self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(W, self.r_t) + torch.matmul(P, x) + self.b_v)
-		self.v_t = torch.transpose(self.v_t, 0, 1)      
-		excitatory = self.v_t[:, :self.hidden_size//2]
-		self.excitatory = torch.cat((excitatory, torch.zeros_like(excitatory)), 1)  
-
+        # input mask
+        # we want this to be orthogonal to the E/I split, so zero out half of excitatory neurons and half of inhibitory neurons
+        input_mask = torch.ones_like(self.P)
+        input_mask[self.hidden_size//2:,:] = 0
+        P = self.P * input_mask
+        
+        self.z_t = torch.zeros(self.hidden_size, 1)
+        x = torch.transpose(x, 0, 1)
+        self.z_t = self.dt * self.Sigmoid(torch.matmul(self.K , self.r_t) + torch.matmul(self.P_z, x) + self.b_z)
+        self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.W, self.r_t) + torch.matmul(P, x) + self.b_v)
+        self.v_t = torch.transpose(self.v_t, 0, 1)                
 
 '''
 class Dale_CB_batch(nn.Module):
@@ -207,7 +157,7 @@ class Dale_CB_batch(nn.Module):
 				x_slice = x[:, n, :]  # Get the nth time step for all elements in the batch
 				self.rnncell(x_slice)
 				#print('outputs', outputs.shape)
-				outputs[:, n, :] = self.rnncell.excitatory
+				outputs[:, n, :] = self.rnncell.v_t
 		return outputs.to(self.device)
 	
 	@classmethod
@@ -428,10 +378,7 @@ class FlipFlop(nn.Module):
 		loss.backward()
 		# nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_norm)
 		optimizer.step()
-		for name, param in self.named_parameters():
-			if param.grad is None:
-				print(f"Parameter '{name}' has None gradient")
-		grad_norms = [p.grad.norm().cpu() for p in self.parameters()]
+		grad_norms = [p.grad.norm().cpu() for p in self.parameters() if p.grad is not None]
 
 		loss_np = loss.item()
 		grad_norm_np = np.mean(grad_norms)
