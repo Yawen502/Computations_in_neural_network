@@ -86,11 +86,11 @@ class FlipFlop(nn.Module):
 
 		# Forward pass through the RNN
 		hidden, _ = self.rnn(x, h0)
-		print('hidden:', hidden.shape)
+		#print('hidden:', hidden.shape)
 		
 		# Pass the last hidden state through the fully connected layer
 		out = self.fc(hidden)
-		print('out:', out.shape)
+		#print('out:', out.shape)
 		return {
 			'output': out, 
 			'hidden': hidden,
@@ -194,7 +194,7 @@ class FlipFlop(nn.Module):
 				print('Epoch %d; loss: %.2e; grad norm: %.2e; learning rate: %.2e; time: %.2es' %
 					(epoch, losses[-1], grad_norms[-1], iter_learning_rate, t_epoch))
 
-			if avg_loss < min_loss or epoch > 500:
+			if avg_loss < min_loss or epoch > 1000:
 				break
 
 			epoch += 1

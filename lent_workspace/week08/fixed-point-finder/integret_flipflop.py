@@ -20,7 +20,7 @@ class FlipFlopData(object):
                  p=0.5,
                  random_seed=0,
                  t_window = 5,
-                 t_relax = 100):
+                 t_relax = 2):
         ''' Creates a FlipFlopData object.
 
         Args:

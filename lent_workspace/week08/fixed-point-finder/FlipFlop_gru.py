@@ -15,14 +15,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-import math
 
 PATH_TO_FIXED_POINT_FINDER = '../../'
 sys.path.insert(0, PATH_TO_FIXED_POINT_FINDER)
 from FixedPointFinderTorch import FixedPointFinderTorch as FixedPointFinder
 from FixedPoints import FixedPoints
 
-from FlipFlopData import FlipFlopData
+from integret_flipflop import FlipFlopData
 
 class FlipFlopDataset(Dataset):
 
@@ -70,136 +69,12 @@ class FlipFlopDataset(Dataset):
 			'targets': targets_bxtxd
 			}
 
-class CB_GRUcell(nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super(CB_GRUcell, self).__init__()
-        self.hidden_size = hidden_size
-    
-        # Rest gate r_t 
-        self.W = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
-        self.P = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))           
-        self.b_v = torch.nn.Parameter(torch.rand(self.hidden_size, 1))   
-
-        # Update gate z_t
-        # K is always positive            
-        self.b_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))     
-        self.K = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
-        self.P_z = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))
-
-        # Firing rate, Scaling factor and time step initialization
-        self.v_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
-
-        # dt is a constant
-        self.dt = nn.Parameter(torch.tensor(0.1), requires_grad = False)
-
-        # Nonlinear functions
-        self.Sigmoid = nn.Sigmoid()
-        self.Tanh = nn.Tanh()
-        self.ReLU = nn.ReLU()
-        for name, param in self.named_parameters():
-            nn.init.uniform_(param, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
-    @property
-    def r_t(self):
-        return self.ReLU(self.v_t)
-
-    def forward(self, x):        
-        if self.v_t.dim() == 3:           
-            self.v_t = self.v_t[0]
-        self.v_t = torch.transpose(self.v_t, 0, 1)
-        # No sign constraint on K and W
-
-        # input mask
-        # we want this to be orthogonal to the E/I split, so zero out half of excitatory neurons and half of inhibitory neurons
-        input_mask = torch.ones_like(self.P)
-        input_mask[self.hidden_size//2:,:] = 0
-        P = self.P * input_mask
-        
-        self.z_t = torch.zeros(self.hidden_size, 1)
-        x = torch.transpose(x, 0, 1)
-        self.z_t = 10*self.dt * self.Sigmoid(torch.matmul(self.K , self.r_t) + torch.matmul(self.P_z, x) + self.b_z)
-        self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.W, self.r_t) + torch.matmul(P, x) + self.b_v)
-        self.v_t = torch.transpose(self.v_t, 0, 1)                
-
-'''
-class CB_GRU_batch(nn.Module):
-	def __init__(self, input_size, hidden_size, batch_first=True):
-		super(CB_GRU_batch, self).__init__()
-		self.device = self._get_device()
-		self.rnncell = CB_GRUcell(input_size, hidden_size).to(self.device)
-		self.batch_first = batch_first
-
-	def forward(self, x):
-		if self.batch_first == True:
-			print('xsize',x.size)
-			for n in range(x.size(1)):
-				#print(x.shape)
-				x_slice = torch.transpose(x[:,n,:], 0, 1)
-				self.rnncell(x_slice)
-		return self.rnncell.excitatory    
-'''		
-
-class CB_GRU_batch(nn.Module):
-	def __init__(self, input_size, hidden_size, batch_first=True):
-		super(CB_GRU_batch, self).__init__()
-		self.device = self._get_device()
-		self.rnncell = CB_GRUcell(input_size, hidden_size).to(self.device)
-		self.batch_first = batch_first
-		self.hidden_size = hidden_size
-
-	def forward(self, x, hidden):
-		# Initialize the output tensor to store the outputs for each time step
-		# x is expected to be of shape (batch_size, seq_len, input_size) if batch_first is True
-		outputs = torch.zeros(x.size(0), x.size(1), self.hidden_size)
-
-		self.rnncell.v_t = hidden
-		if self.batch_first:
-			# Process each time step across all batch elements
-			for n in range(x.size(1)):
-				x_slice = x[:, n, :]  # Get the nth time step for all elements in the batch
-				self.rnncell(x_slice)
-				#print('outputs', outputs.shape)
-				outputs[:, n, :] = self.rnncell.v_t
-		# collect all sequences
-			
-		return outputs.to(self.device), self.rnncell.v_t.to(self.device)
-	
-	@classmethod
-	def _get_device(cls, verbose=False):
-		"""
-		Set the device. CUDA if available, else MPS if available (Apple Silicon), CPU otherwise.
-
-		Args:
-			None.
-
-		Returns:
-			Device string ("cuda", "mps" or "cpu").
-		"""
-		if torch.backends.cuda.is_built() and torch.cuda.is_available():
-			device = "cuda"
-			if verbose: 
-				print("CUDA GPU enabled.")
-		else:
-			device = "cpu"
-			if verbose:
-				print("No GPU found. Running on CPU.")
-
-		# I'm overriding here because of performance and correctness issues with 
-		# Apple Silicon MPS: https://github.com/pytorch/pytorch/issues/94691
-		#
-		# elif torch.backends.mps.is_built() and torch.backends.mps.is_available():
-		# 	device = "mps"
-		# 	if verbose:
-		# 		print("Apple Silicon GPU enabled.")
-
-		return device      
-            
-
 class FlipFlop(nn.Module):
 	def __init__(self, input_size, hidden_size, num_classes):
 		super(FlipFlop, self).__init__()
 		self.hidden_size = hidden_size
 		self.device = self._get_device()
-		self.rnn = CB_GRU_batch(input_size, hidden_size, batch_first=True).to(self._get_device())
+		self.rnn = nn.GRU(input_size, hidden_size, batch_first=True).to(self._get_device())
 		self.fc = nn.Linear(hidden_size, num_classes).to(self._get_device())
 		self._loss_fn = nn.MSELoss().to(self._get_device())
 
@@ -207,29 +82,17 @@ class FlipFlop(nn.Module):
 	def forward(self, data):
 		# Set initial hidden state
 		x = data['inputs'].to(self.device)
-
-		self.rnn.rnncell.v_t = torch.zeros(1, x.size(0), self.hidden_size).to(self.device) 
-
+		h0 = torch.zeros(1, x.size(0), self.hidden_size).to(self.device)
 		# Forward pass through the RNN
-		hidden,_ = self.rnn(x, self.rnn.rnncell.v_t)
-		# output mask
-
-		##output_mask = torch.ones_like(hidden)
-		##output_mask[:,:self.hidden_size//4] = 0
-		##output_mask[:,3*self.hidden_size//4:] = 0   
-
-		#print(hidden.device)
-		#print(output_mask.device)  
-		hidden_masked = hidden
-		##hidden_masked = hidden * output_mask
-		# hidden has shape [1, 64, 16]
-		# x has shape [1, 64, 3]
+		hidden, _ = self.rnn(x, h0)
+		#print('hidden:', hidden.shape)
+		
 		# Pass the last hidden state through the fully connected layer
-		out = self.fc(hidden_masked)
-		#print('out', out.shape)
+		out = self.fc(hidden)
+		#print('out:', out.shape)
 		return {
 			'output': out, 
-			'hidden': hidden_masked,
+			'hidden': hidden,
 			}
 		
 	def predict(self, data):
@@ -247,8 +110,9 @@ class FlipFlop(nn.Module):
 		'''
 		dataset = FlipFlopDataset(data, device=self.device)
 		pred_np = self._forward_np(dataset[:len(dataset)])
-		#print(pred_np.keys())
+		print(pred_np)
 		# change keys to inputs and targets
+		#pred_np['targets'] = pred_np.pop('output')
 		return pred_np
 
 	def _tensor2numpy(self, data):
@@ -329,7 +193,7 @@ class FlipFlop(nn.Module):
 				print('Epoch %d; loss: %.2e; grad norm: %.2e; learning rate: %.2e; time: %.2es' %
 					(epoch, losses[-1], grad_norms[-1], iter_learning_rate, t_epoch))
 
-			if avg_loss < min_loss or epoch > 500:
+			if avg_loss < min_loss or epoch > 1000:
 				break
 
 			epoch += 1
@@ -346,6 +210,7 @@ class FlipFlop(nn.Module):
 		avg_norm = 0
 
 		for batch_idx, batch_data in enumerate(dataloader):
+
 			step_summary = self._train_step(batch_data, optimizer)
 			
 			# Add to the running loss average
@@ -381,7 +246,8 @@ class FlipFlop(nn.Module):
 		loss.backward()
 		# nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_norm)
 		optimizer.step()
-		grad_norms = [p.grad.norm().cpu() for p in self.parameters() if p.grad is not None]
+
+		grad_norms = [p.grad.norm().cpu() for p in self.parameters()]
 
 		loss_np = loss.item()
 		grad_norm_np = np.mean(grad_norms)
@@ -425,4 +291,3 @@ class FlipFlop(nn.Module):
 		# 		print("Apple Silicon GPU enabled.")
 
 		return device
-
