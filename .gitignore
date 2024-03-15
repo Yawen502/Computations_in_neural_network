@@ -1,5 +1,6 @@
 
 data/MNIST/raw/t10k-images-idx3-ubyte
+/data/MNIST
 /lent_workspace/data
 /lent_workspace/week04/data
 /lent_workspace/week03/data/MNIST

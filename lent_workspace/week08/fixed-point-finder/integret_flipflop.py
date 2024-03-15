@@ -16,11 +16,11 @@ class FlipFlopData(object):
 
     def __init__(self,
                  n_bits=3,
-                 n_time=64,
+                 n_time=100,
                  p=0.5,
                  random_seed=0,
-                 t_window = 3,
-                 t_relax = 10):
+                 t_window = 5,
+                 t_relax = 100):
         ''' Creates a FlipFlopData object.
 
         Args:
@@ -106,7 +106,7 @@ class FlipFlopData(object):
                         # Check the next 10 steps for another signal
                         window_end = min(t + int(self.t_window), n_time)
                         if np.any(input_[t+1:window_end] > 0):
-                            # If there's a signal within 10 steps, find the next non-zero pulse
+                            # find the next non-zero pulse
                             for t_next in range(t+1, window_end):
                                 if input_[t_next] > 0:
                                     targets[trial_idx, t_next:, bit_idx] = input_[t_next]
@@ -116,7 +116,7 @@ class FlipFlopData(object):
                         # Check the next 10 steps for another signal
                         window_end = min(t + int(self.t_window), n_time)
                         if np.any(input_[t+1:window_end] < 0):
-                            # If there's a signal within 10 steps, find the next non-zero pulse
+                            # find the next non-zero pulse
                             for t_next in range(t+1, window_end):
                                 if input_[t_next] < 0:
                                     targets[trial_idx, t_next:, bit_idx] = input_[t_next]

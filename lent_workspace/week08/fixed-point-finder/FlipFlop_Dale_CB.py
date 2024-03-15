@@ -163,7 +163,7 @@ class Dale_CBcell(nn.Module):
 
 		self.z_t = torch.zeros(self.hidden_size, 1)
 		x = torch.transpose(x, 0, 1)
-		self.z_t = self.dt * self.sigmoid(torch.matmul(K , self.r_t) + torch.matmul(self.P_z, x) + self.b_z)
+		self.z_t = 10 * self.dt * self.sigmoid(torch.matmul(K , self.r_t) + torch.matmul(self.P_z, x) + self.b_z)
 		self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(W, self.r_t) + torch.matmul(P, x) + self.b_v)
 		self.v_t = torch.transpose(self.v_t, 0, 1)      
 		excitatory = self.v_t[:, :self.hidden_size//2]
@@ -196,19 +196,22 @@ class Dale_CB_batch(nn.Module):
 		self.batch_first = batch_first
 		self.hidden_size = hidden_size
 
-	def forward(self, x):
+	def forward(self, x, hidden):
 		# Initialize the output tensor to store the outputs for each time step
 		# x is expected to be of shape (batch_size, seq_len, input_size) if batch_first is True
 		outputs = torch.zeros(x.size(0), x.size(1), self.hidden_size)
-		
+
+		self.rnncell.v_t = hidden
 		if self.batch_first:
 			# Process each time step across all batch elements
 			for n in range(x.size(1)):
 				x_slice = x[:, n, :]  # Get the nth time step for all elements in the batch
 				self.rnncell(x_slice)
 				#print('outputs', outputs.shape)
-				outputs[:, n, :] = self.rnncell.excitatory
-		return outputs.to(self.device)
+				outputs[:, n, :] = self.rnncell.v_t
+		# collect all sequences
+			
+		return outputs.to(self.device), self.rnncell.v_t.to(self.device)
 	
 	@classmethod
 	def _get_device(cls, verbose=False):
@@ -246,7 +249,7 @@ class FlipFlop(nn.Module):
 		super(FlipFlop, self).__init__()
 		self.hidden_size = hidden_size
 		self.device = self._get_device()
-		self.lstm = Dale_CB_batch(input_size, hidden_size, batch_first=True).to(self._get_device())
+		self.rnn = Dale_CB_batch(input_size, hidden_size, batch_first=True).to(self._get_device())
 		self.fc = nn.Linear(hidden_size, num_classes).to(self._get_device())
 		self._loss_fn = nn.MSELoss().to(self._get_device())
 
@@ -255,10 +258,10 @@ class FlipFlop(nn.Module):
 		# Set initial hidden state
 		x = data['inputs'].to(self.device)
 
-		self.lstm.rnncell.v_t = torch.zeros(1, x.size(0), self.hidden_size).to(self.device) 
+		self.rnn.rnncell.v_t = torch.zeros(1, x.size(0), self.hidden_size).to(self.device) 
 
 		# Forward pass through the RNN
-		hidden = self.lstm(x)
+		hidden,_ = self.rnn(x, self.rnn.rnncell.v_t)
 		# output mask
 
 		##output_mask = torch.ones_like(hidden)

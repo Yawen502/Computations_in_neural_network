@@ -70,9 +70,9 @@ class FlipFlopDataset(Dataset):
 			'targets': targets_bxtxd
 			}
 
-class Dale_CBcell(nn.Module):
+class CB_GRUcell(nn.Module):
     def __init__(self, input_size, hidden_size):
-        super(Dale_CBcell, self).__init__()
+        super(CB_GRUcell, self).__init__()
         self.hidden_size = hidden_size
     
         # Rest gate r_t 
@@ -90,7 +90,7 @@ class Dale_CBcell(nn.Module):
         self.v_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
 
         # dt is a constant
-        self.dt = nn.Parameter(torch.tensor(0.001), requires_grad = False)
+        self.dt = nn.Parameter(torch.tensor(0.1), requires_grad = False)
 
         # Nonlinear functions
         self.Sigmoid = nn.Sigmoid()
@@ -116,16 +116,16 @@ class Dale_CBcell(nn.Module):
         
         self.z_t = torch.zeros(self.hidden_size, 1)
         x = torch.transpose(x, 0, 1)
-        self.z_t = self.dt * self.Sigmoid(torch.matmul(self.K , self.r_t) + torch.matmul(self.P_z, x) + self.b_z)
+        self.z_t = 10*self.dt * self.Sigmoid(torch.matmul(self.K , self.r_t) + torch.matmul(self.P_z, x) + self.b_z)
         self.v_t = (1 - self.z_t) * self.v_t + self.dt * (torch.matmul(self.W, self.r_t) + torch.matmul(P, x) + self.b_v)
         self.v_t = torch.transpose(self.v_t, 0, 1)                
 
 '''
-class Dale_CB_batch(nn.Module):
+class CB_GRU_batch(nn.Module):
 	def __init__(self, input_size, hidden_size, batch_first=True):
-		super(Dale_CB_batch, self).__init__()
+		super(CB_GRU_batch, self).__init__()
 		self.device = self._get_device()
-		self.rnncell = Dale_CBcell(input_size, hidden_size).to(self.device)
+		self.rnncell = CB_GRUcell(input_size, hidden_size).to(self.device)
 		self.batch_first = batch_first
 
 	def forward(self, x):
@@ -138,19 +138,20 @@ class Dale_CB_batch(nn.Module):
 		return self.rnncell.excitatory    
 '''		
 
-class Dale_CB_batch(nn.Module):
+class CB_GRU_batch(nn.Module):
 	def __init__(self, input_size, hidden_size, batch_first=True):
-		super(Dale_CB_batch, self).__init__()
+		super(CB_GRU_batch, self).__init__()
 		self.device = self._get_device()
-		self.rnncell = Dale_CBcell(input_size, hidden_size).to(self.device)
+		self.rnncell = CB_GRUcell(input_size, hidden_size).to(self.device)
 		self.batch_first = batch_first
 		self.hidden_size = hidden_size
 
-	def forward(self, x):
+	def forward(self, x, hidden):
 		# Initialize the output tensor to store the outputs for each time step
 		# x is expected to be of shape (batch_size, seq_len, input_size) if batch_first is True
 		outputs = torch.zeros(x.size(0), x.size(1), self.hidden_size)
-		
+
+		self.rnncell.v_t = hidden
 		if self.batch_first:
 			# Process each time step across all batch elements
 			for n in range(x.size(1)):
@@ -158,7 +159,9 @@ class Dale_CB_batch(nn.Module):
 				self.rnncell(x_slice)
 				#print('outputs', outputs.shape)
 				outputs[:, n, :] = self.rnncell.v_t
-		return outputs.to(self.device)
+		# collect all sequences
+			
+		return outputs.to(self.device), self.rnncell.v_t.to(self.device)
 	
 	@classmethod
 	def _get_device(cls, verbose=False):
@@ -196,7 +199,7 @@ class FlipFlop(nn.Module):
 		super(FlipFlop, self).__init__()
 		self.hidden_size = hidden_size
 		self.device = self._get_device()
-		self.lstm = Dale_CB_batch(input_size, hidden_size, batch_first=True).to(self._get_device())
+		self.rnn = CB_GRU_batch(input_size, hidden_size, batch_first=True).to(self._get_device())
 		self.fc = nn.Linear(hidden_size, num_classes).to(self._get_device())
 		self._loss_fn = nn.MSELoss().to(self._get_device())
 
@@ -205,10 +208,10 @@ class FlipFlop(nn.Module):
 		# Set initial hidden state
 		x = data['inputs'].to(self.device)
 
-		self.lstm.rnncell.v_t = torch.zeros(1, x.size(0), self.hidden_size).to(self.device) 
+		self.rnn.rnncell.v_t = torch.zeros(1, x.size(0), self.hidden_size).to(self.device) 
 
 		# Forward pass through the RNN
-		hidden = self.lstm(x)
+		hidden,_ = self.rnn(x, self.rnn.rnncell.v_t)
 		# output mask
 
 		##output_mask = torch.ones_like(hidden)
@@ -326,7 +329,7 @@ class FlipFlop(nn.Module):
 				print('Epoch %d; loss: %.2e; grad norm: %.2e; learning rate: %.2e; time: %.2es' %
 					(epoch, losses[-1], grad_norms[-1], iter_learning_rate, t_epoch))
 
-			if avg_loss < min_loss:
+			if avg_loss < min_loss or epoch > 500:
 				break
 
 			epoch += 1

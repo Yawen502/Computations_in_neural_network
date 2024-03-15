@@ -11,9 +11,10 @@ import numpy as np
 
 #from FlipFlop_vanilla import FlipFlop
 #from FlipFlop_CB_GRU import FlipFlop
-from FlipFlop_multiscale import FlipFlop
+
+from FlipFlop_Dale_CB import FlipFlop
 from FixedPointFinderTorch import FixedPointFinderTorch as FixedPointFinder
-from integret_flipflop import FlipFlopData
+from FlipFlopData import FlipFlopData
 #from integret_flipflop import FlipFlopData
 from plot_utils import plot_fps
 
@@ -54,7 +55,7 @@ def train_FlipFlop():
         input_size=n_bits,
         hidden_size=n_hidden,
         num_classes=n_bits)
-#learning rate 1./np.sqrt(batch_size)
+#learning rate 1./np.sqrt(batch_size),0.05
     losses, grad_norms = model.train(train_data, valid_data,
         learning_rate=0.05,
         batch_size=batch_size)
