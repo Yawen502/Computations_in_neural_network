@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 class FlipFlopData(object):
 
 	def __init__(self, 
-		n_bits=3,
+		n_bits=2,
 		n_time=64,
 		p=0.5, 
 		random_seed=0):

@@ -9,10 +9,10 @@ import pdb
 import sys
 import numpy as np
 
-from FlipFlop_vanilla import FlipFlop
+from FlipFlop_lstm import FlipFlop
 from FixedPointFinderTorch import FixedPointFinderTorch as FixedPointFinder
-from FlipFlopData import FlipFlopData
-#from integret_flipflop import FlipFlopData
+#from FlipFlopData import FlipFlopData
+from integret_flipflop import FlipFlopData
 from plot_utils import plot_fps
 
 def train_FlipFlop():
@@ -32,12 +32,12 @@ def train_FlipFlop():
     '''
 
     # Data specifications
-    n_bits = 3
+    n_bits = 2
     n_train = 512
     n_valid = 128
 
     # Model hyperparameters
-    n_hidden = 16
+    n_hidden = 100
     batch_size = 128
 
     # Note: 'gru' should work in principle, and in the TF example it certainly does.

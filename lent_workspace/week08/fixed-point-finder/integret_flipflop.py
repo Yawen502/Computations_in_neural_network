@@ -15,12 +15,12 @@ import matplotlib.pyplot as plt
 class FlipFlopData(object):
 
     def __init__(self,
-                 n_bits=3,
-                 n_time=100,
-                 p=0.5,
+                 n_bits=2,
+                 n_time=500,
+                 p=0.05,
                  random_seed=0,
                  t_window = 5,
-                 t_relax = 2):
+                 t_relax = 100):
         ''' Creates a FlipFlopData object.
 
         Args:

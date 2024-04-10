@@ -194,7 +194,7 @@ class FlipFlop(nn.Module):
 				print('Epoch %d; loss: %.2e; grad norm: %.2e; learning rate: %.2e; time: %.2es' %
 					(epoch, losses[-1], grad_norms[-1], iter_learning_rate, t_epoch))
 
-			if avg_loss < min_loss or epoch > 1000:
+			if avg_loss < min_loss or epoch > 3000:
 				break
 
 			epoch += 1
