@@ -19,10 +19,17 @@ Hyperparameters of model training:
 Batch size, learning rate, optimiser, number of neuron.
 
 *Results: After tuning the hyperparameter to make the task simpler, it is still too hard for all the networks to do.*
+
+![image](https://github.com/Yawen502/Computations_in_neural_network/assets/71087503/33ff643b-7413-452b-bcf4-9ffd0b179127)
+MSE loss: 2.62e-01
+
+For example lstm had this result when number of neuron = 30, batch size = 128, p_emit=0.05, t_window = 5, t_relax = 100
 ### time gap in snake MNIST:
-use time gap of 24, 48, 96 — does not drag down the performance of multiscale RNN
+*use time gap of 24, 48, 96 — does not drag down the performance of multiscale RNN*
 
+### Pushing up network performance:
+increasing number of neuron to 100 or 150 push the network performance to 85%
 
-3. increasing number of neuron to 100 or 150 push the network performance to 85%
-4. Not done - do it next week
-5. Tried reducing emission probability to 0.05. (Explanation of hyperparameters are added to overleaf). Also tried modified batch_size, learning rate, number of neurons,
+### Implementing behavioural flexibility task
+Not done - do it next week
+
