@@ -20,7 +20,7 @@ PATH_TO_FIXED_POINT_FINDER = '../../'
 sys.path.insert(0, PATH_TO_FIXED_POINT_FINDER)
 from FixedPointFinderTorch import FixedPointFinderTorch as FixedPointFinder
 from FixedPoints import FixedPoints
-
+import matplotlib.pyplot as plt
 from integret_flipflop import FlipFlopData
 
 class FlipFlopDataset(Dataset):
@@ -138,20 +138,22 @@ class FlipFlop(nn.Module):
 
 		return self._loss_fn(pred['output'], data['targets'])
 
-	def train(self, train_data, valid_data, 
-		learning_rate=1.0,
-		batch_size=128,
-		min_loss=1e-4, 
-		disp_every=1, 
-		plot_every=5, 
-		max_norm=1.):
+	def train(self, train_data_gen, valid_data_gen, 
+			learning_rate=1.0,
+			batch_size=128,
+			min_loss=1e-5, 
+			disp_every=1, 
+			plot_every=10, 
+			max_norm=1.,
+			regenerate_data_every_n_epochs=1,
+			relative_error_threshold=1e-5):  # new argument for relative error threshold
 
-		train_dataset = FlipFlopDataset(train_data, device=self.device)
-		valid_dataset = FlipFlopDataset(valid_data, device=self.device)
-
-		dataloader = DataLoader(train_dataset, 
-			shuffle=True,
-			batch_size=batch_size)
+		epoch = 0
+		losses = []
+		grad_norms = []
+		mse_errors = []  # List to store MSE errors for plotting
+		fig = None
+		last_relative_error = float('inf')
 
 		# Create the optimizer
 		optimizer = optim.Adam(self.parameters(), 
@@ -172,35 +174,71 @@ class FlipFlop(nn.Module):
 		fig = None
 		
 		while True:
-
 			t_start = time.time()
+
+
+			# Regenerate data at the beginning or at specified epochs
+			if epoch % regenerate_data_every_n_epochs == 0:
+				train_data = train_data_gen.generate_data(n_trials=4*batch_size)
+				valid_data = valid_data_gen.generate_data(n_trials=batch_size)
+				train_dataset = FlipFlopDataset(train_data, device=self.device)
+				valid_dataset = FlipFlopDataset(valid_data, device=self.device)
+			dataloader = DataLoader(train_dataset, 
+									shuffle=True,
+									batch_size=batch_size)
 
 			if epoch % plot_every == 0:
 				valid_pred = self._forward_np(valid_dataset[0:1])
 				fig = FlipFlopData.plot_trials(valid_data, valid_pred, fig=fig)
 
 			avg_loss, avg_norm = self._train_epoch(dataloader, optimizer)
-
-			scheduler.step(metrics=avg_loss)
-			iter_learning_rate = scheduler.state_dict()['_last_lr'][0]
-				
-			# Store the loss
 			losses.append(avg_loss)
 			grad_norms.append(avg_norm)
 
-			t_epoch = time.time() - t_start
-				
-			if epoch % disp_every == 0: 
-				print('Epoch %d; loss: %.2e; grad norm: %.2e; learning rate: %.2e; time: %.2es' %
-					(epoch, losses[-1], grad_norms[-1], iter_learning_rate, t_epoch))
+			scheduler.step(metrics=avg_loss)
+			iter_learning_rate = scheduler.state_dict()['_last_lr'][0]
 
-			if avg_loss < min_loss or epoch > 3000:
+			# Calculate relative error
+			valid_pred = self._forward_np(valid_dataset[:len(valid_dataset)])
+
+			mse = self._loss_fn(torch.Tensor(valid_data['targets']), torch.Tensor(valid_pred['output']))
+			mse_errors.append(mse)
+			variance = np.var(valid_data['targets'], ddof=1)
+			relative_error = mse / variance
+
+			# Calculate change in relative error
+			delta_relative_error = abs(relative_error - last_relative_error)
+
+			# Check if change in relative error is below the threshold
+			if delta_relative_error < relative_error_threshold:
+				print(f'Stopping training. Change in relative error {delta_relative_error} is below threshold {relative_error_threshold}.')
+				break
+
+			last_relative_error = relative_error
+
+			t_epoch = time.time() - t_start
+					
+			if epoch % disp_every == 0: 
+				print('Epoch %d; Relative error: %.2e; Change in RE: %.2e; loss: %.2e; grad norm: %.2e; learning rate: %.2e; time: %.2es' %
+					(epoch, relative_error, delta_relative_error, losses[-1], grad_norms[-1], iter_learning_rate, t_epoch))
+
+			if epoch > 1000:
 				break
 
 			epoch += 1
 
-		valid_pred = self._forward_np(valid_dataset[0:1])
-		fig = FlipFlopData.plot_trials(valid_data, valid_pred, fig=fig)
+		# After training, plot the MSE trajectory
+		#clear figures
+		plt.figure(figsize=(10, 5))
+		plt.plot(mse_errors, label='MSE')
+		plt.xlabel('Epoch')
+		plt.ylabel('Mean Squared Error')
+		plt.title('Training Trajectory of MSE')
+		plt.legend()
+		plt.show()
+
+		#valid_pred = self._forward_np(valid_dataset[0:1])
+		#fig = FlipFlopData.plot_trials(valid_data, valid_pred, fig=fig)
 
 		return losses, grad_norms
 

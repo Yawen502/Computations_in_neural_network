@@ -16,11 +16,11 @@ class FlipFlopData(object):
 
     def __init__(self,
                  n_bits=2,
-                 n_time=500,
-                 p=0.05,
+                 n_time=100,
+                 p=0.5,
                  random_seed=0,
-                 t_window = 5,
-                 t_relax = 100):
+                 t_window = 10,
+                 t_relax = 40):
         ''' Creates a FlipFlopData object.
 
         Args:
