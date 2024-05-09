@@ -143,7 +143,7 @@ class FlipFlop(nn.Module):
 			batch_size=128,
 			min_loss=1e-5, 
 			disp_every=1, 
-			plot_every=10, 
+			plot_every=50, 
 			max_norm=1.,
 			regenerate_data_every_n_epochs=1,
 			relative_error_threshold=1e-5):  # new argument for relative error threshold
@@ -229,13 +229,7 @@ class FlipFlop(nn.Module):
 
 		# After training, plot the MSE trajectory
 		#clear figures
-		plt.figure(figsize=(10, 5))
-		plt.plot(mse_errors, label='MSE')
-		plt.xlabel('Epoch')
-		plt.ylabel('Mean Squared Error')
-		plt.title('Training Trajectory of MSE')
-		plt.legend()
-		plt.show()
+		np.save('lstm_mse_errors.npy', mse_errors)
 
 		#valid_pred = self._forward_np(valid_dataset[0:1])
 		#fig = FlipFlopData.plot_trials(valid_data, valid_pred, fig=fig)
