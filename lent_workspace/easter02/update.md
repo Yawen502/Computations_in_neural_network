@@ -8,7 +8,7 @@
 
 Example trial of CB-GRU:
 ![image](https://github.com/Yawen502/Computations_in_neural_network/assets/71087503/7264c5a3-f227-4a54-8a2a-8bd6360fae0d)
-It seems our bRNN models are stuck at local minimum (at approximately 4e-01), cannot converge to zero like the other models.
+It seems our bRNN models are stuck at local minimum (at approximately 4e-02), cannot converge to zero like the other models.
 
 ## fixed point behaviour of multiscale
 
