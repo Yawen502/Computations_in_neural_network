@@ -72,48 +72,49 @@ class FlipFlopDataset(Dataset):
 			}
 
 class multiscale_RNN_cell(nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super(multiscale_RNN_cell, self).__init__()
-        self.hidden_size = hidden_size
-    
-        # Rest gate r_t 
-        self.W = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
-        self.P = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))           
-        self.b_v = torch.nn.Parameter(torch.rand(self.hidden_size, 1))   
+	def __init__(self, input_size, hidden_size):
+		super(multiscale_RNN_cell, self).__init__()
+		self.hidden_size = hidden_size
+	
+		# Rest gate r_t 
+		self.W = torch.nn.Parameter(torch.rand(self.hidden_size, self.hidden_size))
+		self.P = torch.nn.Parameter(torch.rand(self.hidden_size, input_size))           
+		self.b_v = torch.nn.Parameter(torch.rand(self.hidden_size, 1))   
 
-        # Update gate z_t
-        # Wz is defined in the forward function
+		# Update gate z_t
+		# Wz is defined in the forward function
 
-        self.b_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))         
+		self.b_z = torch.nn.Parameter(torch.rand(self.hidden_size, 1))         
 
-        # Firing rate, Scaling factor and time step initialization
-        self.r_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
-        self.z_low = torch.tensor(0.005)
-        self.z_high = torch.tensor(1.0)
-        # Nonlinear functions
-        self.Sigmoid = nn.Sigmoid()
-        self.Tanh = nn.Tanh()
-        glorot_init = lambda w: nn.init.uniform_(w, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
-        for W in [self.W, self.P]:
-            glorot_init(W)
-        # init b_z to be log 1/99
-        nn.init.constant_(self.b_z, torch.log(torch.tensor(1/99)))
+		# Firing rate, Scaling factor and time step initialization
+		self.r_t = torch.zeros(1, self.hidden_size, dtype=torch.float32)
+		self.z_low = torch.tensor(0.005)
+		self.z_high = torch.tensor(1.0)
+		# Nonlinear functions
+		self.Sigmoid = nn.Sigmoid()
+		self.Tanh = nn.Tanh()
+		glorot_init = lambda w: nn.init.uniform_(w, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
+		for W in [self.W, self.P]:
+			glorot_init(W)
+		# init b_z to be log 1/99
+		nn.init.constant_(self.b_z, torch.log(torch.tensor(1/99)))
+		nn.init.constant_(self.b_v, 0)
 
-    def forward(self, x):        
-        if self.r_t.dim() == 3:           
-            self.r_t = self.r_t[0]
-        self.r_t = torch.transpose(self.r_t, 0, 1)
-        x = torch.transpose(x, 0, 1)
-        self.z_t = self.z_low + (self.z_high - self.z_low)*self.Sigmoid(self.b_z)
+	def forward(self, x):        
+		if self.r_t.dim() == 3:           
+			self.r_t = self.r_t[0]
+		self.r_t = torch.transpose(self.r_t, 0, 1)
+		x = torch.transpose(x, 0, 1)
+		self.z_t = self.z_low + (self.z_high - self.z_low)*self.Sigmoid(self.b_z)
 
-        # input mask
-        # we want this to be orthogonal to the E/I split, so zero out half of excitatory neurons and half of inhibitory neurons
-        input_mask = torch.ones_like(self.P)
-        #input_mask[self.hidden_size//2:,:] = 0
-        P = self.P * input_mask
+		# input mask
+		# we want this to be orthogonal to the E/I split, so zero out half of excitatory neurons and half of inhibitory neurons
+		input_mask = torch.ones_like(self.P)
+		#input_mask[self.hidden_size//2:,:] = 0
+		P = self.P * input_mask
 
-        self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Sigmoid(torch.matmul(self.W, self.r_t) + torch.matmul(P, x) + self.b_v)
-        self.r_t = torch.transpose(self.r_t, 0, 1)                                 
+		self.r_t = (1 - self.z_t) * self.r_t + self.z_t * self.Sigmoid(torch.matmul(self.W, self.r_t) + torch.matmul(P, x) + self.b_v)
+		self.r_t = torch.transpose(self.r_t, 0, 1)                                 
 
 class multiscale_RNN_batch(nn.Module):
 	def __init__(self, input_size, hidden_size, batch_first=True):
@@ -174,7 +175,7 @@ class multiscale_RNN_batch(nn.Module):
 		# 		print("Apple Silicon GPU enabled.")
 
 		return device      
-            
+			
 
 class FlipFlop(nn.Module):
 	def __init__(self, input_size, hidden_size, num_classes):

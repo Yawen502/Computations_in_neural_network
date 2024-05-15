@@ -14,7 +14,7 @@ from FixedPointFinderTorch import FixedPointFinderTorch as FixedPointFinder
 #from FlipFlopData import FlipFlopData
 from integret_flipflop_nowindow import FlipFlopData
 from plot_utils import plot_fps
-6
+
 def train_FlipFlop():
     ''' Train an RNN to solve the N-bit memory task.
 
@@ -87,14 +87,14 @@ def find_fixed_points(model, valid_predictions):
     '''
 
     NOISE_SCALE = 0.5 # Standard deviation of noise added to initial states
-    N_INITS = 1024 # The number of initial states to provide
+    N_INITS = 2 # The number of initial states to provide
     print(valid_predictions.keys())
     n_bits = valid_predictions['output'].shape[2]
 
     '''Fixed point finder hyperparameters. See FixedPointFinder.py for detailed
     descriptions of available hyperparameters.'''
     fpf_hps = {
-        'max_iters': 10000,
+        'max_iters': 5,
         'lr_init': 1.,
         'outlier_distance_scale': 10.0,
         'verbose': True, 
@@ -127,6 +127,7 @@ def main():
 
     
     # STEP 2: Find, analyze, and visualize the fixed points of the trained RNN
+
     find_fixed_points(model, valid_predictions)
 
     print('Entering debug mode to allow interaction with objects and figures.')

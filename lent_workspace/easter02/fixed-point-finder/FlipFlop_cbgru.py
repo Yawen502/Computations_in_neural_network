@@ -96,8 +96,14 @@ class multiscale_RNN_cell(nn.Module):
 		# Nonlinear functions
 		self.Sigmoid = nn.Sigmoid()
 		self.Tanh = nn.Tanh()
-		for name, param in self.named_parameters():
-			nn.init.uniform_(param, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
+		glorot_init = lambda w: nn.init.uniform_(w, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
+		for W in [self.W, self.P, self.K, self.P_z]:
+			glorot_init(W)
+		nn.init.constant_(self.b_z, torch.log(torch.tensor(1/99)))
+		nn.init.constant_(self.b_v, 0.0)
+		
+		#for name, param in self.named_parameters():
+			#nn.init.uniform_(param, a=-(1/math.sqrt(hidden_size)), b=(1/math.sqrt(hidden_size)))
 	@property
 	def r_t(self):
 		return self.Sigmoid(self.v_t)
